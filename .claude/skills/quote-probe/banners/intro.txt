@@ -1,0 +1,23 @@
+QUOTE PROBE -- Irving  |  Phase 1  |  STOCKHODL
+
+  .---------------------------------------------------.
+  |  BBQ KING - USED CAR SALES          [_][=][X]     |
+  |...................................................|
+  |                                                   |
+  |  Hi, I'm Irving. Can I interest you in            |
+  |  some brisket while the quotes load?              |
+  |                                                   |
+  |  $ pnpm probe:massive && curl nbp                 |
+  |    AAPL     ...  fresh                            |
+  |    SPY      ...  fresh                            |
+  |    AAPL 5m  ...  fresh                            |
+  |    USD/PLN  ...  fresh                            |
+  |                                                   |
+  |  > pipeline healthy. nobody saw a thing.          |
+  |                                                   |
+  |                                                   |
+  '---------------------------------------------------'
+                        |||
+               _________|_|_________
+  Agent Irving - Market Data Probe (stock-follow)
+    deterministic + claude-fable-5

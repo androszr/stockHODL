@@ -1,0 +1,1 @@
+ALTER TABLE "dividend_payments" ADD COLUMN "deleted" boolean DEFAULT false NOT NULL;

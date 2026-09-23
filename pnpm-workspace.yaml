@@ -1,0 +1,21 @@
+allowBuilds:
+  esbuild: true
+  sharp: false
+  unrs-resolver: false
+
+# drizzle-kit still pulls the deprecated @esbuild-kit/* shims, which pin
+# esbuild ~0.18 — vulnerable to GHSA-67mh-4wv8-2f99 (dev-server SSRF). Nothing
+# here ever runs `esbuild serve`, but there is no reason to ship the old build.
+# Scoped so tsx/vite keep their own newer esbuild.
+overrides:
+  "@esbuild-kit/core-utils>esbuild": "^0.25.12"
+  # nanoid <3.3.18 loops forever when a CUSTOM generator is asked for zero
+  # characters (GHSA-2v37-7h3g-55p8). It reaches us seven levels down —
+  # better-auth > next/vitest > postcss > nanoid — and only postcss calls it,
+  # at BUILD time, never with a zero size, so nothing serving a request can
+  # reach it. Pinned anyway: it is one line, and an advisory nobody can
+  # dismiss on sight is one that hides the next real one. Caret-pinned INSIDE
+  # major 3 deliberately: an open ">=3.3.18" resolves to nanoid 6, three
+  # majors past what postcss asks for, which is a far bigger change than the
+  # advisory it fixes.
+  "nanoid@<3.3.18": "^3.3.18"

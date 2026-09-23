@@ -1,0 +1,153 @@
+/*
+ * Design tokens — the ONLY place a color literal may appear in this repo.
+ * docs/context.md § Design system.
+ *
+ * Two layers:
+ *   1. Raw CSS custom properties on :root / [data-theme] — swappable at runtime.
+ *   2. `@theme inline` maps them into Tailwind utilities (bg-surface-1, text-gain, ...).
+ *      `inline` is load-bearing: it makes utilities emit var(--surface-1) instead of
+ *      baking the value, which is what lets the theme switch without a rebuild.
+ *
+ * Dark is the design target; light is supported from day one.
+ */
+
+/* ---- Layer 1: raw tokens ------------------------------------------------ */
+
+:root {
+  /* Surfaces */
+  --surface-0: oklch(0.16 0.011 260); /* page background */
+  --surface-1: oklch(0.21 0.013 260); /* card / row background */
+  --surface-2: oklch(0.26 0.015 260); /* raised card, hover */
+
+  /* Text */
+  --text-primary: oklch(0.97 0.004 260);
+  --text-secondary: oklch(0.79 0.009 260);
+  --text-muted: oklch(0.66 0.012 260);
+
+  /* Semantic P/L — direction is NEVER expressed as a raw hex anywhere else */
+  --gain: oklch(0.76 0.17 152);
+  --loss: oklch(0.68 0.2 22);
+  --neutral: oklch(0.66 0.012 260);
+
+  /* Chart strokes may diverge from text weights for legibility at 1.5px */
+  --sparkline-gain: oklch(0.78 0.18 152);
+  --sparkline-loss: oklch(0.7 0.21 22);
+
+  /* Interactive */
+  --accent: oklch(0.68 0.16 258);
+  --accent-contrast: oklch(0.99 0 0);
+
+  /* Borders */
+  --border-subtle: oklch(0.3 0.012 260);
+  --border-strong: oklch(0.42 0.014 260);
+
+  /* Focus ring — accessibility, never removed */
+  --ring: oklch(0.78 0.13 258);
+
+  /*
+   * Character colour is baked into the illustrated assets under
+   * assets/illustrated/ and the xcassets copies. Those files are not src/,
+   * so baked colour is allowed. Do not re-add --mascot-* to recolour them.
+   */
+
+  /*
+   * Allocation categories (analytics breakdown). Eight hues spread around the
+   * wheel so adjacent slices stay distinguishable, plus a deliberately
+   * DESATURATED `--cat-unknown` for the "we could not classify this" bucket —
+   * it must never look like one more category. Colour is never the only
+   * carrier: every slice is labelled in text with its amount and share.
+   *
+   * `--benchmark` is the SPY line on the comparison chart. Neutral on
+   * purpose: the portfolio line carries the gain/loss token, and a second
+   * tinted line would read as a second verdict. The chart also dashes it, so
+   * the two lines separate with colour filters off.
+   */
+  --cat-1: oklch(0.72 0.14 258);
+  --cat-2: oklch(0.74 0.13 190);
+  --cat-3: oklch(0.71 0.14 305);
+  --cat-4: oklch(0.79 0.14 85);
+  --cat-5: oklch(0.75 0.14 140);
+  --cat-6: oklch(0.72 0.14 345);
+  --cat-7: oklch(0.75 0.14 45);
+  --cat-8: oklch(0.7 0.12 225);
+  --cat-unknown: oklch(0.6 0.012 260);
+  --benchmark: oklch(0.75 0.03 260);
+}
+
+:root[data-theme='light'] {
+  --surface-0: oklch(0.99 0 0);
+  --surface-1: oklch(0.975 0.003 260);
+  --surface-2: oklch(0.94 0.005 260);
+
+  --text-primary: oklch(0.2 0.012 260);
+  --text-secondary: oklch(0.42 0.012 260);
+  --text-muted: oklch(0.56 0.012 260);
+
+  /* Same hues, lower lightness — green/red on white needs the contrast */
+  --gain: oklch(0.53 0.16 152);
+  --loss: oklch(0.52 0.2 22);
+  --neutral: oklch(0.56 0.012 260);
+
+  --sparkline-gain: oklch(0.58 0.17 152);
+  --sparkline-loss: oklch(0.56 0.21 22);
+
+  --accent: oklch(0.52 0.17 258);
+  --accent-contrast: oklch(0.99 0 0);
+
+  --border-subtle: oklch(0.9 0.005 260);
+  --border-strong: oklch(0.8 0.008 260);
+
+  --ring: oklch(0.55 0.15 258);
+
+  /* Same hues, lower lightness — a category chip on white needs the contrast. */
+  --cat-1: oklch(0.55 0.15 258);
+  --cat-2: oklch(0.56 0.13 190);
+  --cat-3: oklch(0.54 0.16 305);
+  --cat-4: oklch(0.62 0.14 85);
+  --cat-5: oklch(0.57 0.14 140);
+  --cat-6: oklch(0.55 0.16 345);
+  --cat-7: oklch(0.58 0.15 45);
+  --cat-8: oklch(0.53 0.13 225);
+  --cat-unknown: oklch(0.56 0.012 260);
+  --benchmark: oklch(0.5 0.03 260);
+}
+
+/* ---- Layer 2: Tailwind mapping ----------------------------------------- */
+
+@theme inline {
+  --color-surface-0: var(--surface-0);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-gain: var(--gain);
+  --color-loss: var(--loss);
+  --color-neutral: var(--neutral);
+
+  --color-accent: var(--accent);
+  --color-accent-contrast: var(--accent-contrast);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+
+  --color-ring: var(--ring);
+
+  --color-cat-1: var(--cat-1);
+  --color-cat-2: var(--cat-2);
+  --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4);
+  --color-cat-5: var(--cat-5);
+  --color-cat-6: var(--cat-6);
+  --color-cat-7: var(--cat-7);
+  --color-cat-8: var(--cat-8);
+  --color-cat-unknown: var(--cat-unknown);
+  --color-benchmark: var(--benchmark);
+
+  /* Numbers are monospace everywhere. Without tabular figures, price columns
+     visibly jitter on every 30s quote poll. */
+  --font-mono:
+    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}

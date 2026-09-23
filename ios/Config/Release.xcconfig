@@ -1,0 +1,16 @@
+#include "Base.xcconfig"
+
+// Baked into the build (plan B.6): changing the production domain means a new
+// TestFlight build, which is the reason the API is versioned under `/v1/` and
+// the reason the server does not break a contract while a build that uses it is
+// still alive — up to 90 days.
+API_BASE_URL = https:$(SLASH)$(SLASH)sawa-finance.vercel.app
+
+// Release signs for DISTRIBUTION, and a distribution build must claim the
+// production APNs environment — App Store Connect rejects an upload that says
+// `development`. The only difference between the two files is that one key;
+// ios.yml fails the build if any other line diverges.
+//
+// The widget target is unaffected: it sets CODE_SIGN_ENTITLEMENTS in
+// project.pbxproj, and a target-level setting outranks an xcconfig.
+CODE_SIGN_ENTITLEMENTS = Config/StockHODL-Release.entitlements

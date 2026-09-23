@@ -1,0 +1,52 @@
+// Settings shared by every configuration of the app target.
+//
+// These live here rather than in project.pbxproj so that changing where the
+// app points is a one-line diff in a readable file, not a hunt through a
+// property list. `Debug.xcconfig` and `Release.xcconfig` include this and then
+// differ only in the two things that actually differ: the API host and whether
+// cleartext HTTP to a local machine is permitted.
+
+// xcconfig has no string quoting and `//` starts a comment — writing
+// `https://host` here silently yields `https:`. Indirecting through a variable
+// is the standard way out, and the reason this file looks odd.
+SLASH = /
+
+// Set here rather than through Xcode's Signing & Capabilities pane, which would
+// write it into project.pbxproj instead. Not a secret — the same ten characters
+// are published in the AASA file, which Apple fetches unauthenticated.
+DEVELOPMENT_TEAM = KURWX5TYSZ
+
+// Associated Domains + App Groups. The first is what makes a native passkey
+// assertion possible at all; the second is claimed now, unused until C2, so the
+// App ID is already provisioned for it when the snapshot cache lands.
+CODE_SIGN_ENTITLEMENTS = Config/StockHODL.entitlements
+
+// A partial plist: `GENERATE_INFOPLIST_FILE` stays YES and Xcode merges its
+// generated keys into this one, so only the keys we genuinely own live here.
+INFOPLIST_FILE = Config/Info.plist
+
+// The keychain scope the app and its widget extension SHARE. A widget is a
+// separate process: without a common access group it cannot see the session
+// token at all, and would render "sign in" beside a signed-in app.
+//
+// Written with the team ID rather than `$(AppIdentifierPrefix)` because this
+// value has to reach TWO places — the entitlements file, where the prefix
+// variable is available, and Info.plist, whose processing runs before code
+// signing has computed it. One literal that both can expand beats two spellings
+// that must agree. Not a secret, for the same reason DEVELOPMENT_TEAM above is
+// not: the ten characters are published in the AASA file.
+KEYCHAIN_ACCESS_GROUP = $(DEVELOPMENT_TEAM).com.robertandrosz.stockhodl.shared
+
+// The keychain item's `kSecAttrService`, shared verbatim by the app and the
+// widget extension. Each target's own PRODUCT_BUNDLE_IDENTIFIER cannot serve
+// this: the extension's is `com.robertandrosz.stockhodl.widgets`, not the
+// app's `com.robertandrosz.stockhodl`, and a `KeychainTokenStore` that
+// defaulted to `Bundle.main.bundleIdentifier` filed the token under two
+// different service strings — reproduced on-device as the app reading the
+// token fine while the widget got errSecItemNotFound for it, despite sharing
+// the access group. One literal, expanded into both Info.plists below.
+KEYCHAIN_SERVICE = com.robertandrosz.stockhodl
+
+// The App Group container, named once. `SnapshotStore.swift` must agree with
+// it, and the widget reads the very same file the app writes.
+APP_GROUP = group.com.robertandrosz.stockhodl

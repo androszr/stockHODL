@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- How `xcodebuild -exportArchive` turns the archive into something App
+	     Store Connect will accept. Committed rather than generated in the
+	     workflow so the distribution decisions are reviewable in a diff. -->
+
+	<!-- Xcode 15.3 renamed this value to `app-store-connect` and still accepts
+	     the old spelling; the old spelling is accepted by every version, so it
+	     is the one that cannot break on a runner-image bump. -->
+	<key>method</key>
+	<string>app-store</string>
+
+	<!-- Export to a local .ipa FIRST so the entitlements can be read back out
+	     of the thing that is about to be uploaded. The archive itself is
+	     signed with a development identity — that is normal, and it is
+	     `-exportArchive` that re-signs for distribution and swaps
+	     `aps-environment` to `production`. Checking the archive therefore
+	     proves nothing about the upload.
+
+	     The workflow flips this one key to `upload` on a copy and re-runs the
+	     same export, so the verified build and the uploaded build come from
+	     the same archive through the same options. `altool` is deprecated and
+	     Transporter is another install, so uploading through `-exportArchive`
+	     stays the supported path and reuses the API key signing already
+	     needs. -->
+	<key>destination</key>
+	<string>export</string>
+
+	<!-- Not a secret — the same ten characters are published in the AASA file
+	     and live in Base.xcconfig for the same reason. -->
+	<key>teamID</key>
+	<string>KURWX5TYSZ</string>
+
+	<!-- dSYMs go up with the build, so a crash report from the phone
+	     symbolicates instead of arriving as hex addresses. -->
+	<key>uploadSymbols</key>
+	<true/>
+
+	<key>signingStyle</key>
+	<string>automatic</string>
+
+	<!-- Xcode would otherwise pick the next free build number itself at export
+	     time. The workflow passes the GitHub run number instead, so the build
+	     that appears in TestFlight can be traced back to the CI run and the
+	     commit that produced it. -->
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

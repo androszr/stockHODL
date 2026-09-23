@@ -1,0 +1,1 @@
+ALTER TABLE "option_positions" ADD COLUMN "fees" numeric(20, 8) DEFAULT '0' NOT NULL;

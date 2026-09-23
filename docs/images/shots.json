@@ -1,0 +1,42 @@
+{
+ "hero.png": {
+  "alt": "StockHODL on two phones: the Dashboard with the day's total and the market strip, and Holdings with the value chart, on one invented portfolio.",
+  "shows": "Dashboard and Holdings, side by side.",
+  "width_px": 1900,
+  "height_px": 1864,
+  "scale": 2,
+  "display_width": 880,
+  "bytes": 533059,
+  "book_sha256": "1c6c39ae915dfbeab61b7befe947101d7ef42157ed0ba48235a48c6c4904a8e6"
+ },
+ "stock.png": {
+  "alt": "Apple's own page beside the Options book, each in an iPhone frame.",
+  "shows": "The instrument screen and the Options screen, side by side.",
+  "width_px": 1900,
+  "height_px": 1864,
+  "scale": 2,
+  "display_width": 880,
+  "bytes": 525208,
+  "book_sha256": "1c6c39ae915dfbeab61b7befe947101d7ef42157ed0ba48235a48c6c4904a8e6"
+ },
+ "summary.png": {
+  "alt": "The daily close summary on an iPhone: the day's figure for the whole book.",
+  "shows": "The day report, in an iPhone frame.",
+  "width_px": 958,
+  "height_px": 1864,
+  "scale": 2,
+  "display_width": 479,
+  "bytes": 266714,
+  "book_sha256": "1c6c39ae915dfbeab61b7befe947101d7ef42157ed0ba48235a48c6c4904a8e6"
+ },
+ "widgets.png": {
+  "alt": "The Home Screen tiles for holdings and options, and the Lock Screen line, with the same invented figures.",
+  "shows": "Holdings tile, Options tile, and the Lock Screen accessory.",
+  "width_px": 912,
+  "height_px": 818,
+  "scale": 2,
+  "display_width": 456,
+  "bytes": 75223,
+  "book_sha256": "1c6c39ae915dfbeab61b7befe947101d7ef42157ed0ba48235a48c6c4904a8e6"
+ }
+}

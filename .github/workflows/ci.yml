@@ -1,0 +1,62 @@
+name: CI
+
+# A commit that only touches the Swift client has nothing for THIS workflow to
+# do — there is no Next build to run in it (docs/ios-native.md A.2). The Swift
+# guards that such a commit does need live in `ios.yml`, which carries no path
+# filter for exactly that reason.
+#
+# `src/lib/api/contracts/` and `src/styles/tokens.css` are the SOURCES the iOS
+# codegen reads, and they live under `src/`, so `paths-ignore: ios/**` never
+# suppresses them. That is why the schemas were put there rather than in
+# `ios/` — a contract change cannot be made without this workflow running.
+on:
+  pull_request:
+    paths-ignore: ['ios/**']
+  push:
+    branches: [main]
+    paths-ignore: ['ios/**']
+
+# A newer push to the same branch cancels the older run — no point paying for
+# CI on a commit that is already superseded.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Lint · Typecheck · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm lint
+
+      - run: pnpm typecheck
+
+      - run: pnpm test
+
+      # `next build` runs env() at module scope for any route that touches auth
+      # or the DB, so it needs syntactically valid values. These are throwaways
+      # — the build never opens a connection.
+      - name: Build
+        run: pnpm build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          BETTER_AUTH_SECRET: ci-placeholder-secret-not-used-in-production-000
+          BETTER_AUTH_URL: http://localhost:3000
+          # Required (not optional) in the env schema, so the build refuses to
+          # start without it. Never used: CI makes no market-data request.
+          STOCK_API: ci-placeholder-not-a-real-key
+          ALLOWED_EMAIL: ci@example.com

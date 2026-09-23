@@ -1,0 +1,25 @@
+#include "Base.xcconfig"
+
+// The dev loop: the simulator shares the Mac's network stack, so `localhost`
+// there really is `pnpm dev`.
+API_BASE_URL = http:$(SLASH)$(SLASH)localhost:3000
+
+// On a phone it is not. `localhost` is the phone, nothing answers on :3000,
+// and every request dies in transport before the passkey sheet even opens.
+//
+// Pointing a Debug device build at the Mac's LAN address would fix the
+// transport and break the ceremony instead: the rpID is derived from this
+// host, and a passkey minted for `sawa-finance.vercel.app` cannot be asserted
+// against `192.168.x.x` — there is no AASA file there to authorise the app.
+// A device build therefore talks to production, and the only thing Debug
+// still buys on hardware is the debugger.
+API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)sawa-finance.vercel.app
+
+// Cleartext to localhost needs an ATS exception, and plan B.6 is explicit that
+// it must not exist in Release. That is why there are two plists rather than
+// one with a substituted value: ATS reads booleans, and a build-setting
+// expansion in a plist can only produce a string.
+//
+// Info-Debug.plist is Info.plist plus NSAllowsLocalNetworking. Keep them in
+// step by hand — there are three keys between them.
+INFOPLIST_FILE = Config/Info-Debug.plist

@@ -1,0 +1,65 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/refresh-symbols",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron/refresh-history",
+      "schedule": "30 23 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "15 20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "30 20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "45 20 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "15 21 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "30 21 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "45 21 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "0 22 * * 1-5"
+    },
+    {
+      "path": "/api/cron/daily-summary",
+      "schedule": "15 22 * * 1-5"
+    },
+    {
+      "path": "/api/cron/morning-brief",
+      "schedule": "30 12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/morning-brief",
+      "schedule": "45 12 * * 1-5"
+    },
+    {
+      "path": "/api/cron/morning-brief",
+      "schedule": "0 13 * * 1-5"
+    },
+    {
+      "path": "/api/cron/morning-brief",
+      "schedule": "15 13 * * 1-5"
+    }
+  ]
+}

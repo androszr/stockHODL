@@ -1,0 +1,20 @@
+SHIP  |  Phase 0  |  default model  |  STOCK-FOLLOW
+
+  .---------------------------------------------------.
+  |  [dark army // stock-follow]       [_][=][X]      |
+  |....................................................|
+  |                                                    |
+  |  > CONNECTION ESTABLISHED_                         |
+  |                                                    |
+  |  a plan nobody wrote down is a plan nobody read.   |
+  |  so we plan before we touch the code.              |
+  |                                                    |
+  |  $ ./ship.sh --plan --verify --audit               |
+  |  ##############################  100%              |
+  |  pipeline armed. nobody commits but you.           |
+  |                                                    |
+  '----------------------------------------------------'
+                        |||
+               _________|_|_________
+  /ship - stock-follow pipeline
+    plan -> preflight -> accept -> implement -> verify -> audit

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The widget extension's shipping plist. A partial one, like the app's:
+	     GENERATE_INFOPLIST_FILE stays YES and Xcode merges its keys in.
+
+	     Info-Widgets-Debug.plist is this file plus NSAllowsLocalNetworking, on
+	     the same two-file arrangement as the app (plan B.6) and for the same
+	     reason — ATS reads booleans, so it cannot be a substituted value, and a
+	     cleartext exception must not be reachable from a Release build. Keep
+	     the shared keys in step by hand; there are three of them. -->
+
+	<!-- The extension point. Without it the bundle is not a widget and the
+	     system simply never offers it in the gallery. -->
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+
+	<!-- The same host the app talks to, expanded from the same API_BASE_URL in
+	     the per-configuration xcconfig. `AppConfig.load(from: .main)` reads the
+	     EXTENSION's bundle here, not the app's — an extension has its own — so
+	     the key genuinely has to be repeated rather than inherited. -->
+	<key>APIBaseURL</key>
+	<string>$(API_BASE_URL)</string>
+
+	<!-- Where to find the session token. Must equal the app's value; both
+	     expand KEYCHAIN_ACCESS_GROUP from Base.xcconfig so they cannot drift. -->
+	<key>KeychainAccessGroup</key>
+	<string>$(KEYCHAIN_ACCESS_GROUP)</string>
+
+	<!-- Must equal the app's value in Info.plist / Info-Debug.plist — both
+	     expand KEYCHAIN_SERVICE from Base.xcconfig. This target's own bundle
+	     identifier (`com.robertandrosz.stockhodl.widgets`) is NOT this: a
+	     `KeychainTokenStore` that defaulted to `Bundle.main.bundleIdentifier`
+	     queried under that string, which the app never wrote to — reproduced
+	     on-device as the extension getting errSecItemNotFound for a token the
+	     app had just read successfully, despite sharing the access group. -->
+	<key>KeychainService</key>
+	<string>$(KEYCHAIN_SERVICE)</string>
+</dict>
+</plist>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Without this the system refuses to run a passkey ceremony for the
+	     relying party at all, which is why the paid Apple Developer Program is
+	     a hard dependency of this stage and not a nicety (plan B.2).
+
+	     Apple fetches /.well-known/apple-app-site-association from this exact
+	     host through its own CDN and caches it for up to a day. If the
+	     association looks broken right after a change, reinstall before
+	     debugging anything else; append `?mode=developer` on a debug build to
+	     bypass the CDN. The route that serves the file is
+	     src/app/.well-known/apple-app-site-association/route.ts and it answers
+	     404 until APPLE_APP_ID is set in the environment. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:sawa-finance.vercel.app</string>
+	</array>
+
+	<!-- Claimed in C1, used since C2 for the payload snapshot, and read by the
+	     widget extension since the widgets landed — which is exactly the
+	     "addition rather than a migration" the early claim was for (plan A.8).
+	     Kept as a literal rather than $(APP_GROUP): SnapshotStore.swift names
+	     it in Swift too, and a container that silently resolves to nothing is
+	     the one failure mode worth making greppable. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.robertandrosz.stockhodl</string>
+	</array>
+
+	<!-- The shared keychain scope. The widget runs as its own process with its
+	     own keychain view, so the session token has to live somewhere both can
+	     query; without this the widget is permanently signed out beside a
+	     signed-in app. Expanded from KEYCHAIN_ACCESS_GROUP in Base.xcconfig so
+	     the app and the extension cannot spell it differently.
+
+	     Adding it also changes what the EXISTING item matches — see
+	     MigratingTokenStore.swift, which is what stops this from signing every
+	     current install out on update. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(KEYCHAIN_ACCESS_GROUP)</string>
+	</array>
+
+	<!-- Required for ANY remote notification (plans/2026-08-20-price-move-push-alerts.md).
+	     `development` is the SANDBOX APNs environment, and it is correct for a
+	     build run from Xcode over a cable — nothing else. The split promised
+	     here is now done: `StockHODL-Release.entitlements` carries
+	     `production` and Release.xcconfig points at it, because App Store
+	     Connect REJECTS an upload whose entitlement says `development`.
+
+	     The two are different token universes: a device token minted under
+	     one is `BadDeviceToken` at the other's host. `APNS_ENVIRONMENT` on the
+	     server picks which host it pushes to, so it and the build the phone is
+	     actually running have to agree. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

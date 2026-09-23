@@ -1,0 +1,4 @@
+interface:
+  display_name: "Probe"
+  short_description: "Read-only smoke alarm for stock-follow — a fixed set of shell checks against the running system (a deployed URL, a local"
+  default_prompt: "Use $probe for this task."

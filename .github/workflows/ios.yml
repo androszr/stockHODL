@@ -1,0 +1,144 @@
+name: iOS
+
+# NO `paths-ignore` here, deliberately — this is the difference between this
+# workflow and `ci.yml`, and the reason it is a separate file at all.
+#
+# These checks were once a job inside CI, which ignores `ios/**` because a
+# Swift-only commit has no Next build to run. That made the money and ATS
+# guards unreachable by the very commits they exist to police: a `Double(`
+# introduced by an iOS-only change sailed through, and was only ever caught
+# because it happened to travel with a `src/` edit. A guard that skips the
+# files it guards is decoration.
+#
+# Path filters are per-workflow, not per-job, so splitting the file IS the
+# fix. It costs about a minute of ubuntu on commits that touch neither side —
+# cheaper than the guard being absent.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # The Swift the iOS client compiles against is GENERATED — from the zod
+  # contracts and from tokens.css — and committed, so the Xcode build never
+  # needs Node. That only stays honest if something re-runs the generators and
+  # objects when the committed output no longer matches its source.
+  #
+  # This runs on ubuntu: the codegen is Node, and a real Swift build would mean
+  # a macOS runner at a 10x minute multiplier. Compiling Swift in CI is
+  # deliberately out of scope for now .
+  # ---------------------------------------------------------------------------
+  contracts:
+    name: iOS contracts · tokens · money discipline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Only when this app compiles GENERATED Swift (contracts, tokens) from
+      # another tree. Delete both steps if nothing is generated.
+      - name: Regenerate the Swift contracts and tokens
+        run: pnpm ios:gen
+
+      - name: Fail if the committed Swift is out of date
+        run: |
+          if ! git diff --exit-code -- ios/StockHODLShared/Generated/; then
+            echo "::error::ios/StockHODLShared/Generated/ is stale. Run 'pnpm ios:gen' and commit the result."
+            exit 1
+          fi
+
+      # Non-negotiable #1, ported. The generated contracts type every amount as
+      # String and Money.swift is the only sanctioned door to Decimal; a
+      # `Double(` anywhere in the client is the same bug the web preflight
+      # greps for as `parseFloat`.
+      #
+      # Charts are the one real exception — Swift Charts plots Doubles — and
+      # when that arrives (stage C3) it goes in PlotPoints.swift and gets added
+      # to this allowlist BY NAME, so the exception stays one file wide.
+      - name: Refuse a Double anywhere near money
+        run: |
+          # Allowlist BY FILE NAME, one file wide. Add the chart-geometry file
+          # here when charts arrive; never widen it to a directory.
+          hits=$(grep -rn 'Double(' ios --include='*.swift' \
+            | grep -v '^ios/StockHODL/Charts/PlotPoints.swift:' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Double() outside the sanctioned chart-geometry boundary. See CLAUDE.md non-negotiable #1."
+            exit 1
+          fi
+
+      # `.minute()` prints a minute with no leading zero, so ten o'clock reads
+      # "10:0" — a clock time missing a digit, beside money. It shipped in five
+      # separate formatters because each one looks right in isolation and the
+      # bug only appears on the fifty-nine minutes an hour where it does not.
+      # `.minute(.twoDigits)` is the only spelling this app wants.
+      - name: Refuse a minute without both digits
+        run: |
+          hits=$(grep -rn --include='*.swift' -e '\.minute()' ios || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::.minute() drops the leading zero — '10:0'. Use .minute(.twoDigits)."
+            exit 1
+          fi
+
+      # The cleartext-HTTP exception exists so the dev loop can talk to
+      # `pnpm dev` on localhost, and it must never
+      # ship. Two Info.plists is what keeps them apart — and two files that
+      # differ by one key is exactly the pair someone eventually "tidies" into
+      # one. This is the guard that notices.
+      # The widget extension has the same pair for the same reason — it talks
+      # to `pnpm dev` in the simulator too — so the guard covers both shipping
+      # plists rather than the one it was written for.
+      - name: Refuse an ATS exception in a shipping Info.plist
+        run: |
+          for plist in ios/Config/Info.plist ios/Config/Info-*.plist; do
+            case "$plist" in *-Debug.plist) continue ;; esac
+            if grep -q 'NSAppTransportSecurity' "$plist"; then
+              echo "::error::$plist carries an ATS exception. Release ships that file; localhost belongs in the -Debug twin only."
+              exit 1
+            fi
+          done
+
+      # Release signs for distribution and therefore needs a different
+      # aps-environment, which is why there are two entitlements files at all.
+      # Everything else about them must stay identical — see the script.
+      - name: Refuse drift between the Debug and Release entitlements
+        run: python3 scripts/check-entitlements.py
+
+      # A TCC gate the app can REACH and has not DECLARED does not produce a
+      # denied permission — iOS terminates the process. There is no error
+      # message anywhere, so this class of bug ships as an app that vanishes
+      # mid-typing. The camera was the first; the keyboard's dictation key,
+      # which runs in-process since iOS 16, is the second and third.
+      - name: Refuse a missing privacy usage string
+        run: python3 scripts/check-privacy-strings.py
+
+      # The app and its extension must name the SAME keychain access group, or
+      # the widget silently reads an empty scope and renders "sign in" beside a
+      # signed-in app — a failure with no error message anywhere. Both expand
+      # one build setting; this is what notices if someone inlines either.
+      - name: Refuse a drifted keychain access group
+        run: |
+          hits=$(grep -c '\$(KEYCHAIN_ACCESS_GROUP)' \
+            ios/Config/*.entitlements ios/Config/Info*.plist | grep -v ':1$' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::every entitlements/Info plist must reference \$(KEYCHAIN_ACCESS_GROUP) exactly once. A literal group is how the widget goes silently signed out."
+            exit 1
+          fi

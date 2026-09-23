@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The widget extension's half of the two things it shares with the app,
+	     and deliberately nothing else.
+
+	     No `associated-domains`: a passkey ceremony needs a UI and a user, and
+	     a system-woken renderer has neither. When the token is gone the widget
+	     says so and deep-links into the app, which is the only place a sign-in
+	     can honestly happen. Claiming the entitlement here would suggest
+	     otherwise. -->
+
+	<!-- Read side of the snapshot the app writes (Live/SnapshotStore.swift).
+	     This is what lets the widget paint without a network round trip, and
+	     while the phone is locked — the file is written with
+	     `completeFileProtectionUntilFirstUserAuthentication` for exactly that. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.robertandrosz.stockhodl</string>
+	</array>
+
+	<!-- Read side of the session token. Same value as the app's entitlement,
+	     from the same build setting; if these two ever differ the widget is
+	     silently signed out and nothing says why. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(KEYCHAIN_ACCESS_GROUP)</string>
+	</array>
+</dict>
+</plist>

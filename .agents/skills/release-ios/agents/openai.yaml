@@ -1,0 +1,4 @@
+interface:
+  display_name: "Release Ios"
+  short_description: "Runbook for shipping the stock-follow iOS app — what a push to main under ios/ sets in motion (archive, export with the "
+  default_prompt: "Use $release-ios for this task."

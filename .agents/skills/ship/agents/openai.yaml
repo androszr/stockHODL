@@ -1,0 +1,4 @@
+interface:
+  display_name: "Ship"
+  short_description: "Turn a request for a change in stock-follow into a written plan on Dark Army's Kanban board, and stop there."
+  default_prompt: "Use $ship for this task."

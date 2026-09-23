@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Info.plist, plus the one Debug-only key. Keep the shared keys in step
+	     with Config/Info.plist. -->
+	<key>APIBaseURL</key>
+	<string>$(API_BASE_URL)</string>
+
+	<!-- The screenshot importer's camera. REQUIRED, not optional: iOS kills
+	     the process outright when a camera is presented without this string,
+	     so its absence is a crash rather than a denied permission. The
+	     sentence says what the picture is FOR — a permission prompt that only
+	     says "wants camera access" is one people refuse on principle.
+
+	     There is deliberately no photo-library string: the picker is a
+	     PHPicker, which runs out of process and hands back only what the user
+	     chose, so the app never holds library access to ask for. -->
+	<key>NSCameraUsageDescription</key>
+	<string>Photograph a broker screen to fill in a transaction or an option purchase. The picture is read once and never stored.</string>
+
+	<!-- Keyboard dictation's microphone and speech recogniser. Since iOS 16
+	     the dictation key runs IN THE HOST PROCESS, so it trips the same TCC
+	     gate the camera does: with no string here, tapping the mic key on the
+	     keyboard terminates the app outright rather than being refused. Every
+	     free-text field in the app — a transaction or dividend note, a symbol,
+	     a portfolio name — is therefore a reachable microphone.
+
+	     Two keys, not one: iOS asks for speech recognition alongside the
+	     microphone, and declaring only the microphone leaves the second gate
+	     undeclared and the crash intact. `scripts/check-privacy-strings.py`
+	     is what keeps both of them in both plists. -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Use the keyboard's dictation key to speak into a form field instead of typing. Nothing is recorded or kept by this app.</string>
+
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Turn dictated speech into text in a form field. The words go straight into the field and are never stored.</string>
+
+	<!-- The shared keychain scope, so `KeychainTokenStore` never spells the
+	     team prefix in Swift. Expanded from KEYCHAIN_ACCESS_GROUP; must match
+	     the `keychain-access-groups` entitlement exactly, which is why both
+	     read the same build setting. -->
+	<key>KeychainAccessGroup</key>
+	<string>$(KEYCHAIN_ACCESS_GROUP)</string>
+
+	<!-- Must equal the widget extension's value in Info-Widgets-Debug.plist —
+	     both expand KEYCHAIN_SERVICE from Base.xcconfig. Each target's own
+	     bundle identifier is NOT this: the extension's differs from the app's,
+	     and a keychain query built from it never matches the item the other
+	     wrote. -->
+	<key>KeychainService</key>
+	<string>$(KEYCHAIN_SERVICE)</string>
+
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<!-- The price-alert notification's tap target. Must match Config/Info.plist
+	     — see the comment there. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.robertandrosz.stockhodl.pushdeeplink</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>stockhodl</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- Debug ONLY (plan B.6). This permits cleartext to local hostnames —
+	     localhost and .local — and nothing else; it is not a blanket
+	     NSAllowsArbitraryLoads. Release must never carry it, which is why it
+	     lives in a separate file rather than behind a substituted value. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

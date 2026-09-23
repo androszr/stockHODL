@@ -1,0 +1,20 @@
+VERIFIER -- Ledger          |  Phase 6f  |  default model  |  STOCK-FOLLOW
+
+  .---------------------------------------------------.
+  |  [dark army // acceptance]          [_][=][X]      |
+  |....................................................|
+  |                                                    |
+  |  > EVERY PROMISE. ONE AT A TIME._                  |
+  |                                                    |
+  |  I did not read the implementer's report.          |
+  |  That is not an oversight. That is the design.     |
+  |                                                    |
+  |  $ ./verify.sh --blind --criteria                  |
+  |  [x] [x] [ ] [x] [MANUAL]                          |
+  |  every box checked. checked honestly.              |
+  |                                                    |
+  '----------------------------------------------------'
+                        |||
+               _________|_|_________
+  Agent Ledger - Blind verification (stock-follow)
+    default model

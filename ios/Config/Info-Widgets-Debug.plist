@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Info-Widgets.plist, plus the one Debug-only key. Keep the shared keys
+	     in step with Config/Info-Widgets.plist. -->
+
+	<!-- The extension point. Without it the bundle is not a widget and the
+	     system simply never offers it in the gallery. -->
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.widgetkit-extension</string>
+	</dict>
+
+	<!-- The same host the app talks to, expanded from the same API_BASE_URL in
+	     the per-configuration xcconfig. `AppConfig.load(from: .main)` reads the
+	     EXTENSION's bundle here, not the app's — an extension has its own — so
+	     the key genuinely has to be repeated rather than inherited. -->
+	<key>APIBaseURL</key>
+	<string>$(API_BASE_URL)</string>
+
+	<!-- Where to find the session token. Must equal the app's value; both
+	     expand KEYCHAIN_ACCESS_GROUP from Base.xcconfig so they cannot drift. -->
+	<key>KeychainAccessGroup</key>
+	<string>$(KEYCHAIN_ACCESS_GROUP)</string>
+
+	<!-- Must equal the app's value in Info.plist / Info-Debug.plist — both
+	     expand KEYCHAIN_SERVICE from Base.xcconfig. This target's own bundle
+	     identifier (`com.robertandrosz.stockhodl.widgets`) is NOT this: a
+	     `KeychainTokenStore` that defaulted to `Bundle.main.bundleIdentifier`
+	     queried under that string, which the app never wrote to — reproduced
+	     on-device as the extension getting errSecItemNotFound for a token the
+	     app had just read successfully, despite sharing the access group. -->
+	<key>KeychainService</key>
+	<string>$(KEYCHAIN_SERVICE)</string>
+
+	<!-- Debug ONLY (plan B.6). The widget talks to `pnpm dev` on localhost in
+	     the simulator exactly as the app does, and a widget you cannot exercise
+	     against a dev server is a widget you only ever test in production.
+	     Local hostnames only — not a blanket NSAllowsArbitraryLoads — and it
+	     lives in a separate file so Release can never carry it. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

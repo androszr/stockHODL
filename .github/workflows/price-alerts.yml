@@ -1,0 +1,44 @@
+name: Price alerts
+
+# Triggers `/api/cron/check-price-alerts` on a cadence Vercel Cron likely
+# cannot schedule on the current plan tier (its own two entries in
+# vercel.json are once-daily) — plans/2026-08-20-price-move-push-alerts.md
+# "Trigger" section. `CRON_SECRET` must be added as a GitHub repo secret,
+# matching the value already set in the Vercel project env.
+#
+# Cadence: every 10 minutes, inside a UTC band covering US market hours
+# (04:00-20:00 ET, pre-market through after-hours) under BOTH DST offsets —
+# cron has no timezone concept, so the band is the union rather than either
+# half: EDT (UTC-4) needs 08:00-00:00 UTC, EST (UTC-5) needs 09:00-01:00 UTC,
+# so 08:00-01:59 UTC covers each. The band crosses midnight UTC, which is why
+# the day list runs 1-6: a Friday 20:00 ET close is Saturday 01:00 UTC. Runs
+# landing outside a real session are harmless — the route finds no fresh bars.
+on:
+  schedule:
+    - cron: '*/10 0-1,8-23 * * 1-6'
+  workflow_dispatch: {}
+
+# Nothing is checked out and GITHUB_TOKEN is never used; the other workflows
+# all declare a permissions block and this one has nothing to ask for.
+permissions: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the check
+        run: |
+          # --config reads from stdin so the secret never appears in curl's
+          # argv (and so never in `ps` output on a self-hosted runner).
+          status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 300 --config - <<EOF
+          url = "https://sawa-finance.vercel.app/api/cron/check-price-alerts"
+          header = "Authorization: Bearer ${CRON_SECRET}"
+          EOF
+          )
+          echo "status=$status"
+          if [ "$status" -ge 400 ]; then
+            echo "check-price-alerts answered $status" >&2
+            exit 1
+          fi
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

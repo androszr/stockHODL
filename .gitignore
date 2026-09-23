@@ -1,0 +1,71 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# gitnexus (local code index)
+/.gitnexus/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# iOS client (docs/ios-native.md A.2)
+# The generated Swift under ios/StockHODLShared/Generated/ IS committed — the Xcode
+# build must not depend on Node. Only the codegen's own scratch is ignored.
+ios/DerivedData/
+ios/build/
+ios/StockHODLShared/Generated/*.tmp/
+**/xcuserdata/
+*.xcuserstate
+.bob-companion/
+
+# Local working state — plans, assistant state and Dark Army's per-project
+# folder live on the author's disk and are never published (docs/plans.md).
+/plans/
+/docs/research/
+.dark-army/
+.claude/RESUME.md
+.claude/scheduled_tasks.lock
+
+# Private strings the public-copy guards check for (docs/publishing.md) and
+# the design-pass still the mascot look was locked from — both stay local.
+/.private-strings
+/assets/illustrated/look-reference.jpg
+
+# Python bytecode (tools/demo_shots.py)
+__pycache__/

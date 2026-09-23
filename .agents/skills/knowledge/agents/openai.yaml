@@ -1,0 +1,4 @@
+interface:
+  display_name: "Knowledge"
+  short_description: "Interview the person for this project's standing knowledge and file it with Bob — what the project is for, who uses it, "
+  default_prompt: "Use $knowledge for this task."

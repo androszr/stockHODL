@@ -1,0 +1,9 @@
+# Project-scoped Grok configuration. Only [mcp_servers], [plugins] and
+# [permission] are read from a project file; everything else comes from
+# ~/.grok/config.toml. Generated agent shims live in .grok/agents/ (one per
+# .claude/agents/*.md, written by tools/gen_agent_shims.py — never edit them
+# by hand).
+
+[mcp_servers.gitnexus]
+command = "npx"
+args = ["-y", "gitnexus", "mcp"]

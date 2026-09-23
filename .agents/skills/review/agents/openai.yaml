@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review"
+  short_description: "Review a change — the working tree, one of the last commits, a branch or a pull request — using the GitNexus code graph."
+  default_prompt: "Use $review for this task."
