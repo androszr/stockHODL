@@ -37,6 +37,11 @@ concurrency:
   group: testflight
   cancel-in-progress: false
 
+# `actions: read` lets the server-deployed guard list Deploy's runs.
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   upload:
     name: Archive and upload to TestFlight
@@ -49,6 +54,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The server-deployed guard walks ancestry back to the last Deploy.
+          fetch-depth: 0
 
       # One build number for the whole run, decided before any key or
       # certificate is touched, and refused outright when it cannot be right:
@@ -229,6 +237,15 @@ jobs:
           unzip -q "$IPA" -d "$RUNNER_TEMP/verify-versions"
           APP=$(ls -d "$RUNNER_TEMP/verify-versions/Payload"/*.app)
           python3 scripts/check-ios-bundle-versions.py --app "$APP" --build-number "$BUILD_NUMBER"
+
+      # A build must never reach the phone ahead of the API it speaks: on
+      # 2026-09-28 one did, and every holding showed no value until the server
+      # caught up. Placed after the archive so a Deploy started by the same
+      # push has had those minutes to finish; waits for one still running.
+      - name: Refuse a build whose server is not in production
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/check-server-deployed.py
 
       # The same archive through the same options, with `destination` flipped
       # on a copy — so what goes up is what was just checked, and the

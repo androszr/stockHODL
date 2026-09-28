@@ -47,6 +47,9 @@ be tracked.
 - **iOS** — every push that touches `ios/`.
 - **TestFlight** — every push that touches `ios/`, its own workflow file or
   the two build-number scripts, and **Run workflow** on the Actions tab.
+  It refuses to upload until Deploy has put the server side of the same
+  commit in production (waiting for a Deploy still running), so the phone
+  never runs ahead of the API it speaks.
 - **Price alerts** — on its schedule, not on a push. GitHub switches
   scheduled workflows off in a public repository after 60 days without a
   push; a push, or re-enabling it on the Actions tab, turns it back on.
