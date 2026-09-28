@@ -125,7 +125,7 @@ say so in your report rather than silently working around it.
 | Field | Value |
 |---|---|
 | `src_dir` | `src/` |
-| Framework | Next.js 16 API host + iOS Swift client. There is no web product UI. |
+| Framework | Next.js 16 API host + iOS + macOS Swift client (one target, same bundle id; the Mac build is local-only, plans/2026-09-28-native-mac-app-stage-1.md). There is no web product UI. |
 | Package manager | pnpm 11 (Node 22) |
 | `lint_gate` | `pnpm lint` |
 | `typecheck_gate` | `pnpm typecheck` |
@@ -492,7 +492,8 @@ change must work on every iPhone size the app already supports.
   untouched by watching a stock.
 - **`/api/mobile/v1/*` — the phone's JSON API** (2026-08-17, docs/ios-native.md
   stage S1). The native iOS client (SwiftUI) is not deployed with the server.
-  The phone is the only client; there is no web product UI.
+  The phone and the Mac app are the two clients, one codebase, one bundle id;
+  there is no web product UI.
 
   The rules that keep the surface from spreading:
 
@@ -635,6 +636,35 @@ change must work on every iPhone size the app already supports.
   (`KEYCHAIN_ACCESS_GROUP` in `Base.xcconfig`, referenced by every entitlements
   and Info plist), and `MigratingTokenStore` moves the pre-widget item into it
   so the update does not sign existing installs out.
+
+  **The Mac build (2026-09-28, plans/2026-09-28-native-mac-app-stage-1.md).**
+  The app target also builds natively for macOS 26 (`SUPPORTED_PLATFORMS`
+  gains `macosx`, `SDKROOT = auto`, no Catalyst) under the SAME bundle id, so
+  the passkey `rpID`, the association file and `APPLE_APP_ID` are unchanged and
+  the server needs nothing — the Mac sends the same `x-stockhodl-client: ios`
+  header through the same `/api/mobile/v1/*` doors. A sidebar shell
+  (`App/MacShell.swift`, driven by the testable `MacSidebarSection`) replaces
+  the tab bar on the Mac around the phone's own per-tab stacks. Four decisions
+  a later change must not undo: (1) `KeychainTokenStore` sets
+  `kSecUseDataProtectionKeychain` on every query — a no-op on iOS, and on the
+  Mac the only keychain where an access group works, which is what a later Mac
+  widget will share the session through; the item's service, account and
+  group are unchanged, so no iPhone install is signed out. (2) The widget
+  extension's embed and target dependency carry `platformFilters = (ios, )`:
+  the Mac product contains no widget, though the widget VIEW files still
+  compile into the Mac app (accessory families are `#if os(iOS)`). (3) The Mac
+  signs with its own `ios/Config/StockHODL-macOS.entitlements` (App Sandbox,
+  network client, user-selected read-only, the same app group, keychain group
+  and associated domain as the iPhone pair, and the macOS spelling
+  `com.apple.developer.aps-environment`), pointed at by
+  `CODE_SIGN_ENTITLEMENTS[sdk=macosx*]` in both xcconfigs; the iPhone pair is
+  untouched and `check-entitlements.py` still pairs only those two, while
+  `scripts/tests/test_macos_entitlements.py` pins the Mac file's shared values
+  to the iPhone Debug file. (4) That Mac file is ONE file for both
+  configurations and says `development` — right for a build run from Xcode,
+  wrong for distribution; the Mac release-pipeline card adds the `production`
+  twin. A Mac Debug build talks to production (`API_BASE_URL[sdk=macosx*]`)
+  for the same rpID reason a device build does. No workflow builds the Mac.
 
   `ci.yml` and `deploy.yml` carry `paths-ignore: ['ios/**']`, and ESLint
   ignores `ios/**` explicitly. The contracts and tokens live under `src/`

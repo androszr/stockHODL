@@ -23,3 +23,14 @@ API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)sawa-finance.vercel.app
 // Info-Debug.plist is Info.plist plus NSAllowsLocalNetworking. Keep them in
 // step by hand — there are three keys between them.
 INFOPLIST_FILE = Config/Info-Debug.plist
+
+// The Mac build (plans/2026-09-28-native-mac-app-stage-1.md) talks to
+// production for the same reason a device build does: the rpID derives from
+// this host and there is no association file at localhost, so a passkey could
+// never be asserted. The NSAllowsLocalNetworking exception in Info-Debug.plist
+// stays where it is and is simply unused on the Mac.
+API_BASE_URL[sdk=macosx*] = https:$(SLASH)$(SLASH)sawa-finance.vercel.app
+
+// The Mac signs with its own entitlements (sandbox, network client, the macOS
+// spelling of the push key); the iPhone keeps Base.xcconfig's file.
+CODE_SIGN_ENTITLEMENTS[sdk=macosx*] = Config/StockHODL-macOS.entitlements

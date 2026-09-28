@@ -1,4 +1,8 @@
-import UIKit
+#if canImport(UIKit)
+    import UIKit
+#elseif canImport(AppKit)
+    import AppKit
+#endif
 
 /// What a fetch attempt actually established.
 ///
@@ -47,7 +51,7 @@ enum RemoteImageOutcome: Sendable {
 /// registry to save it would be more moving parts than the saving is worth.
 final class RemoteImageCache: @unchecked Sendable {
     private let lock = NSLock()
-    private var images: [String: UIImage] = [:]
+    private var images: [String: PlatformImage] = [:]
     private var missing: Set<String> = []
     private let fetch: @Sendable (String) async -> RemoteImageOutcome
     /// The half that survives the process — see `RemoteImageDisk` for why a
@@ -75,12 +79,12 @@ final class RemoteImageCache: @unchecked Sendable {
         Task.detached(priority: .utility) { [weak self] in
             let stored = disk.loadAll()
             guard !stored.isEmpty else { return }
-            var decoded: [String: UIImage] = [:]
+            var decoded: [String: PlatformImage] = [:]
             var absent: Set<String> = []
             for (key, data) in stored {
                 if data.isEmpty {
                     absent.insert(key)
-                } else if let image = UIImage(data: data) {
+                } else if let image = PlatformImage(data: data) {
                     decoded[key] = image
                 }
             }
@@ -90,19 +94,19 @@ final class RemoteImageCache: @unchecked Sendable {
 
     /// Disk loses to anything the process has already learned: a fetch that
     /// finished while the warm was in flight is the fresher fact.
-    private func merge(images decoded: [String: UIImage], missing absent: Set<String>) {
+    private func merge(images decoded: [String: PlatformImage], missing absent: Set<String>) {
         lock.withLock {
             images.merge(decoded) { existing, _ in existing }
             missing.formUnion(absent.subtracting(Set(images.keys)))
         }
     }
 
-    func cached(_ key: String) -> UIImage? {
+    func cached(_ key: String) -> PlatformImage? {
         lock.withLock { images[key] }
     }
 
-    func image(for key: String) async -> UIImage? {
-        let known = lock.withLock { () -> (UIImage?, Bool) in
+    func image(for key: String) async -> PlatformImage? {
+        let known = lock.withLock { () -> (PlatformImage?, Bool) in
             (images[key], missing.contains(key))
         }
         if let hit = known.0 { return hit }
@@ -114,7 +118,7 @@ final class RemoteImageCache: @unchecked Sendable {
         if let stored = await read(key) {
             switch stored {
             case let .bytes(data):
-                if let decoded = UIImage(data: data) {
+                if let decoded = PlatformImage(data: data) {
                     lock.withLock { images[key] = decoded }
                     return decoded
                 }
@@ -128,7 +132,7 @@ final class RemoteImageCache: @unchecked Sendable {
 
         switch await fetch(key) {
         case let .bytes(data):
-            guard let decoded = UIImage(data: data) else {
+            guard let decoded = PlatformImage(data: data) else {
                 // Undecodable bytes ARE definitive: a publisher serving an SVG
                 // under an allowlisted type will serve the same SVG next time.
                 lock.withLock { _ = missing.insert(key) }

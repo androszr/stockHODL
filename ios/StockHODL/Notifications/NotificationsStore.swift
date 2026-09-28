@@ -3,6 +3,8 @@ import Observation
 import UserNotifications
 #if canImport(UIKit)
     import UIKit
+#elseif canImport(AppKit)
+    import AppKit
 #endif
 
 /// The Settings notification switches' data layer — "Price alerts"
@@ -149,6 +151,8 @@ final class NotificationsStore {
         if willAnyBeOn {
             #if canImport(UIKit)
                 UIApplication.shared.registerForRemoteNotifications()
+            #elseif canImport(AppKit)
+                NSApplication.shared.registerForRemoteNotifications()
             #endif
             // The device token itself arrives asynchronously through
             // `PushCoordinator` — this finishes registration if the token is

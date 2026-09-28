@@ -92,10 +92,25 @@ struct KeychainTokenStore: TokenStore {
     }
 
     private var baseQuery: [String: Any] {
+        Self.query(service: service, account: account, accessGroup: accessGroup)
+    }
+
+    /// The identity every read, write and delete matches on. Internal and
+    /// static so a test can read it without an entitled process.
+    ///
+    /// `kSecUseDataProtectionKeychain` selects the iOS-style keychain on the
+    /// Mac, the only one where an access group works — so a later Mac widget
+    /// can share the session the way the phone's does. On iOS every keychain
+    /// already IS the data-protection keychain and the flag changes nothing,
+    /// so no existing install reads a different item. The legacy `nil`-group
+    /// query must carry no group key: that is what still reaches the
+    /// pre-widget item `MigratingTokenStore` moves.
+    static func query(service: String, account: String, accessGroup: String?) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true,
         ]
         if let accessGroup { query[kSecAttrAccessGroup as String] = accessGroup }
         return query

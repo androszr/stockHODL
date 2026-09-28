@@ -1,5 +1,9 @@
 import SwiftUI
-import UIKit
+#if canImport(UIKit)
+    import UIKit
+#elseif canImport(AppKit)
+    import AppKit
+#endif
 
 /// The brand-icon tile — the native half of `src/components/holdings/ticker-logo.tsx`.
 ///
@@ -23,7 +27,7 @@ struct TickerLogo: View {
     var monogramChars: Int = 3
 
     @Environment(\.logoLoader) private var loader
-    @State private var image: UIImage?
+    @State private var image: PlatformImage?
     /// Set only when the bytes arrived AFTER this tile appeared. A cache hit
     /// paints opaque on the first frame with no animation at all — a logo that
     /// fades on every scroll reads as a page that keeps reloading.
@@ -38,7 +42,7 @@ struct TickerLogo: View {
                 .background(Color(Tokens.surface2))
 
             if let image {
-                Image(uiImage: image)
+                Image(platformImage: image)
                     .resizable()
                     .scaledToFill()
                     .frame(width: size, height: size)
@@ -86,15 +90,15 @@ struct TickerLogo: View {
 protocol LogoLoading: AnyObject, Sendable {
     /// A synchronous hit, or nil. Separate from `image(for:)` so an already
     /// decoded logo can paint on the first frame instead of fading in again.
-    func cached(_ symbol: String) -> UIImage?
-    func image(for symbol: String) async -> UIImage?
+    func cached(_ symbol: String) -> PlatformImage?
+    func image(for symbol: String) async -> PlatformImage?
 }
 
 /// The default, and what every preview and test gets: no logos, all
 /// monograms. A screen that cannot reach the network still looks finished.
 final class NoLogoLoader: LogoLoading {
-    func cached(_ symbol: String) -> UIImage? { nil }
-    func image(for symbol: String) async -> UIImage? { nil }
+    func cached(_ symbol: String) -> PlatformImage? { nil }
+    func image(for symbol: String) async -> PlatformImage? { nil }
 }
 
 /// Fetch once, keep forever — the brand-icon half of `RemoteImageCache`,
@@ -116,9 +120,9 @@ final class LogoLoader: LogoLoading, @unchecked Sendable {
         cache = RemoteImageCache(namespace: "logos", disk: disk, fetch: fetch)
     }
 
-    func cached(_ symbol: String) -> UIImage? { cache.cached(symbol) }
+    func cached(_ symbol: String) -> PlatformImage? { cache.cached(symbol) }
 
-    func image(for symbol: String) async -> UIImage? { await cache.image(for: symbol) }
+    func image(for symbol: String) async -> PlatformImage? { await cache.image(for: symbol) }
 
     func purge() { cache.purge() }
 }

@@ -14,3 +14,10 @@ API_BASE_URL = https:$(SLASH)$(SLASH)sawa-finance.vercel.app
 // The widget target is unaffected: it sets CODE_SIGN_ENTITLEMENTS in
 // project.pbxproj, and a target-level setting outranks an xcconfig.
 CODE_SIGN_ENTITLEMENTS = Config/StockHODL-Release.entitlements
+
+// The Mac build uses ONE entitlements file for both configurations in this
+// stage (development push; the build is local-only, run from Xcode). A Mac
+// Release twin carrying `production` belongs to the Mac release-pipeline card,
+// together with teaching check-entitlements.py the macOS pairing. The iPhone
+// line above is unchanged.
+CODE_SIGN_ENTITLEMENTS[sdk=macosx*] = Config/StockHODL-macOS.entitlements

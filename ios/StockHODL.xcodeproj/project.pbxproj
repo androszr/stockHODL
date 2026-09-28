@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AA0000000000000000000035 /* StockHODLWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000027 /* StockHODLWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		AA0000000000000000000035 /* StockHODLWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000027 /* StockHODLWidgets.appex */; platformFilters = (ios, ); settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -50,6 +50,7 @@
 		AA0000000000000000000023 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA0000000000000000000024 /* Info-Debug.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-Debug.plist"; sourceTree = "<group>"; };
 		AA0000000000000000000025 /* StockHODL.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = StockHODL.entitlements; sourceTree = "<group>"; };
+		AA0000000000000000000040 /* StockHODL-macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "StockHODL-macOS.entitlements"; sourceTree = "<group>"; };
 		AA0000000000000000000027 /* StockHODLWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StockHODLWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000000000000000000028 /* StockHODLWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = StockHODLWidgets.entitlements; sourceTree = "<group>"; };
 		AA0000000000000000000029 /* Info-Widgets.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info-Widgets.plist"; sourceTree = "<group>"; };
@@ -149,6 +150,7 @@
 				AA0000000000000000000023 /* Info.plist */,
 				AA0000000000000000000024 /* Info-Debug.plist */,
 				AA0000000000000000000025 /* StockHODL.entitlements */,
+				AA0000000000000000000040 /* StockHODL-macOS.entitlements */,
 				AA0000000000000000000029 /* Info-Widgets.plist */,
 				AA000000000000000000002A /* Info-Widgets-Debug.plist */,
 				AA0000000000000000000028 /* StockHODLWidgets.entitlements */,
@@ -330,6 +332,7 @@
 		};
 		AA0000000000000000000036 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
+			platformFilters = (ios, );
 			target = AA000000000000000000002D /* StockHODLWidgets */;
 			targetProxy = AA0000000000000000000037 /* PBXContainerItemProxy */;
 		};
@@ -409,9 +412,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.robertandrosz.stockhodl;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -434,9 +441,13 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.robertandrosz.stockhodl;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				TARGETED_DEVICE_FAMILY = 1;
 			};

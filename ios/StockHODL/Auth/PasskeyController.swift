@@ -1,5 +1,9 @@
 import AuthenticationServices
-import UIKit
+#if os(iOS)
+    import UIKit
+#else
+    import AppKit
+#endif
 
 /// The real passkey ceremony.
 ///
@@ -106,10 +110,18 @@ extension PasskeyController: ASAuthorizationControllerDelegate {
 
 extension PasskeyController: ASAuthorizationControllerPresentationContextProviding {
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first { $0.isKeyWindow }
-            ?? ASPresentationAnchor()
+        #if os(iOS)
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap(\.windows)
+                .first { $0.isKeyWindow }
+                ?? ASPresentationAnchor()
+        #else
+            // `ASPresentationAnchor` is `NSWindow` here, and it must be a real
+            // one or the passkey sheet never appears.
+            NSApplication.shared.keyWindow
+                ?? NSApplication.shared.windows.first
+                ?? ASPresentationAnchor()
+        #endif
     }
 }

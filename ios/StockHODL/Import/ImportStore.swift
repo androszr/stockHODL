@@ -1,6 +1,10 @@
 import Foundation
 import Observation
-import UIKit
+#if canImport(UIKit)
+    import UIKit
+#elseif canImport(AppKit)
+    import AppKit
+#endif
 
 /// Reading a broker screenshot, for whichever form asked.
 ///
@@ -37,20 +41,20 @@ final class ImportStore {
     /// picker makes double-picking easy.
     private var sequence = 0
 
-    func readTransaction(_ image: UIImage) async -> TransactionImportResponse? {
+    func readTransaction(_ image: PlatformImage) async -> TransactionImportResponse? {
         await read(image) { base64, token in
             try await self.client.transaction(imageBase64: base64, token: token)
         }
     }
 
-    func readOption(_ image: UIImage) async -> OptionImportResponse? {
+    func readOption(_ image: PlatformImage) async -> OptionImportResponse? {
         await read(image) { base64, token in
             try await self.client.option(imageBase64: base64, token: token)
         }
     }
 
     private func read<T>(
-        _ image: UIImage,
+        _ image: PlatformImage,
         _ call: @escaping (String, String) async throws -> T
     ) async -> T? {
         guard let token = tokenProvider() else {
@@ -151,7 +155,7 @@ final class ImportStore {
     }
 
     /// The picker/camera path never reaches `read` — a bad `Data` or a
-    /// `UIImage` decode failure happens in `ScreenshotImportSection` itself,
+    /// `PlatformImage` decode failure happens in `ScreenshotImportSection` itself,
     /// outside this store. It reports through here anyway so both failure
     /// paths log to the same place and show the same message, rather than
     /// leaving the picker silently dropping the pick on the floor.

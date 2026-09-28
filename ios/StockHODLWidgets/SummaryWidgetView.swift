@@ -19,8 +19,19 @@ struct SummaryWidgetView: View {
 
     private var displayFamily: WidgetFamily { previewFamily ?? family }
 
+    /// The accessory families are iPhone-only; the Mac app compiles this
+    /// view (the widget extension itself is not in the Mac build) and only
+    /// ever draws the tile.
+    private var isAccessory: Bool {
+        #if os(iOS)
+            displayFamily == .accessoryRectangular
+        #else
+            false
+        #endif
+    }
+
     var body: some View {
-        if displayFamily == .accessoryRectangular {
+        if isAccessory {
             // Accessory families paint no background of their own, and a
             // widget that declares one anyway is refused a Lock Screen /
             // StandBy placement — same rule `LockScreenWidgetView` follows.

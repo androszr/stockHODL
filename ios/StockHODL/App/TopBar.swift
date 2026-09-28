@@ -137,6 +137,10 @@ struct TopBar: View {
     var onSearch: () -> Void = {}
     let onProfile: () -> Void
 
+    /// A hairline is one PIXEL, not one point; the environment's scale works
+    /// on every platform where `UIScreen` does not.
+    @Environment(\.displayScale) private var displayScale
+
     var body: some View {
         HStack(spacing: 8) {
             leading
@@ -201,7 +205,7 @@ struct TopBar: View {
         .overlay(alignment: .bottom) {
             Rectangle()
                 .fill(Color(Tokens.borderSubtle))
-                .frame(height: 1 / UIScreen.main.scale)
+                .frame(height: 1 / displayScale)
         }
     }
 

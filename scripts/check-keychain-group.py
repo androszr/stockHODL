@@ -25,6 +25,7 @@ import sys
 DEFAULT_FILES = (
     'ios/Config/StockHODL.entitlements',
     'ios/Config/StockHODL-Release.entitlements',
+    'ios/Config/StockHODL-macOS.entitlements',
     'ios/Config/Info.plist',
     'ios/Config/Info-Debug.plist',
 )

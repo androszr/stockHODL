@@ -36,10 +36,16 @@ struct LockScreenWidgetView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch displayFamily {
-        case .accessoryInline: inline
-        default: rectangular
-        }
+        #if os(iOS)
+            switch displayFamily {
+            case .accessoryInline: inline
+            default: rectangular
+            }
+        #else
+            // No accessory families on the Mac; the view compiles into the
+            // Mac app only because the app target shares this folder.
+            rectangular
+        #endif
     }
 
     @ViewBuilder
