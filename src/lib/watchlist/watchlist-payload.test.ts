@@ -262,7 +262,9 @@ describe('composeWatchlistPayload — target grouping and the server sort', () =
 
     const parsed = watchlistPayloadSchema.parse(payload);
     expect(parsed.items[0].targetGroup).toBe('near');
-    expect(parsed.items[0].target?.sentence).toContain('below your');
+    expect(parsed.items[0].target?.sentence).toContain('to reach your');
+    expect(parsed.items[0].target?.sentence).toMatch(/^Needs to rise /);
+    expect(parsed.items[0].target?.targetShort).toBe('101');
     expect(parsed.items[1].target).toBeNull();
   });
 });

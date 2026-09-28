@@ -19,7 +19,11 @@ import WidgetKit
 /// exactly like a rise. That is what the arrow is for; it is not decoration.
 struct LockScreenWidgetView: View {
     let entry: SummaryEntry
+    /// Explicit family for fixed-size synthetic renders outside WidgetKit.
+    var previewFamily: WidgetFamily? = nil
     @Environment(\.widgetFamily) private var family
+
+    private var displayFamily: WidgetFamily { previewFamily ?? family }
 
     var body: some View {
         content
@@ -32,7 +36,7 @@ struct LockScreenWidgetView: View {
 
     @ViewBuilder
     private var content: some View {
-        switch family {
+        switch displayFamily {
         case .accessoryInline: inline
         default: rectangular
         }
@@ -58,16 +62,21 @@ struct LockScreenWidgetView: View {
     /// rather than a fixed column so the two rows agree on where the
     /// percentages sit whatever the label lengths are.
     private func line(_ side: SummarySide, summary: LiveSummary) -> some View {
-        HStack(spacing: 4) {
-            Text(side.title)
+        let label = WidgetSessionPresentation.lockLabel(side: side, summary: summary)
+        let percent = WidgetSessionPresentation.lockPercent(side: side, summary: summary)
+        let session = WidgetSessionPresentation.lockSpokenSession(side: side, summary: summary)
+        return HStack(spacing: 4) {
+            Text(label)
                 // Bigger than the old three-column line could afford: dropping
                 // the amounts frees the width, and a lock-screen glance is
                 // read at arm's length.
                 .font(.caption)
                 .widgetAccentable()
             Spacer(minLength: 2)
-            change(summary.dayChangePct, direction: summary.dayChange?.direction)
+            change(percent, direction: WidgetSessionPresentation.lockDirection(side: side, summary: summary))
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(side.title), \(session) \(percent)")
     }
 
     /// Today's move, as an arrow plus a percentage. The arrow is the only thing
@@ -96,7 +105,11 @@ struct LockScreenWidgetView: View {
         case let .figures(payload, _):
             // `Text` interpolation rather than a stack: the inline family
             // collapses any layout to a single string anyway.
-            Text("Holdings \(payload.holdings.dayChangePct ?? "—")")
+            let label = WidgetSessionPresentation.lockLabel(side: .holdings, summary: payload.holdings)
+            let percent = WidgetSessionPresentation.lockPercent(side: .holdings, summary: payload.holdings)
+            let session = WidgetSessionPresentation.lockSpokenSession(side: .holdings, summary: payload.holdings)
+            Text("\(label) \(percent)")
+                .accessibilityLabel("Holdings, \(session) \(percent)")
         case .signedOut:
             Text("StockHODL — sign in")
         case .unavailable:

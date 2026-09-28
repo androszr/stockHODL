@@ -56,11 +56,7 @@ private struct ToggleSegment: View {
                 .font(.system(.caption, weight: isSelected ? .semibold : .regular))
                 .foregroundStyle(Color(isSelected ? Tokens.textPrimary : Tokens.textMuted))
                 .padding(.horizontal, 10)
-                // 32pt inside a 36pt control. Below the 44pt floor on its own,
-                // so the whole toggle carries the target: the two segments are
-                // adjacent and the pair is comfortably over it in both axes —
-                // the same trade the web's tab strip makes.
-                .frame(minHeight: 32)
+                .frame(minHeight: 44)
                 .frame(maxWidth: .infinity)
                 .background(isSelected ? Color(Tokens.surface0) : Color.clear)
                 .clipShape(RoundedRectangle(cornerRadius: 7))

@@ -38,40 +38,40 @@ enum TokenScheme: Sendable {
 
 enum Tokens {
     static let surface0 = DesignToken(
-        dark: OKLCH(l: 0.16, c: 0.011, h: 260),
-        light: OKLCH(l: 0.99, c: 0, h: 0)
+        dark: OKLCH(l: 0.1859, c: 0.0157, h: 261.55),
+        light: OKLCH(l: 0.9755, c: 0.0045, h: 258.32)
     )
     static let surface1 = DesignToken(
-        dark: OKLCH(l: 0.21, c: 0.013, h: 260),
-        light: OKLCH(l: 0.975, c: 0.003, h: 260)
+        dark: OKLCH(l: 0.2337, c: 0.0214, h: 260.54),
+        light: OKLCH(l: 1, c: 0, h: 0)
     )
     static let surface2 = DesignToken(
-        dark: OKLCH(l: 0.26, c: 0.015, h: 260),
-        light: OKLCH(l: 0.94, c: 0.005, h: 260)
+        dark: OKLCH(l: 0.2865, c: 0.0271, h: 257.53),
+        light: OKLCH(l: 0.9473, c: 0.0108, h: 256.7)
     )
     static let textPrimary = DesignToken(
-        dark: OKLCH(l: 0.97, c: 0.004, h: 260),
-        light: OKLCH(l: 0.2, c: 0.012, h: 260)
+        dark: OKLCH(l: 0.9728, c: 0.0057, h: 264.53),
+        light: OKLCH(l: 0.2452, c: 0.0305, h: 256.86)
     )
     static let textSecondary = DesignToken(
-        dark: OKLCH(l: 0.79, c: 0.009, h: 260),
-        light: OKLCH(l: 0.42, c: 0.012, h: 260)
+        dark: OKLCH(l: 0.7961, c: 0.0204, h: 260.17),
+        light: OKLCH(l: 0.4845, c: 0.0352, h: 256.1)
     )
     static let textMuted = DesignToken(
-        dark: OKLCH(l: 0.66, c: 0.012, h: 260),
-        light: OKLCH(l: 0.56, c: 0.012, h: 260)
+        dark: OKLCH(l: 0.6961, c: 0.0279, h: 259.04),
+        light: OKLCH(l: 0.5447, c: 0.0337, h: 257.79)
     )
     static let gain = DesignToken(
-        dark: OKLCH(l: 0.76, c: 0.17, h: 152),
-        light: OKLCH(l: 0.53, c: 0.16, h: 152)
+        dark: OKLCH(l: 0.7944, c: 0.1321, h: 160.94),
+        light: OKLCH(l: 0.5079, c: 0.13, h: 157.8)
     )
     static let loss = DesignToken(
-        dark: OKLCH(l: 0.68, c: 0.2, h: 22),
-        light: OKLCH(l: 0.52, c: 0.2, h: 22)
+        dark: OKLCH(l: 0.7739, c: 0.134, h: 16.09),
+        light: OKLCH(l: 0.5286, c: 0.1656, h: 16.28)
     )
     static let neutral = DesignToken(
-        dark: OKLCH(l: 0.66, c: 0.012, h: 260),
-        light: OKLCH(l: 0.56, c: 0.012, h: 260)
+        dark: OKLCH(l: 0.6961, c: 0.0279, h: 259.04),
+        light: OKLCH(l: 0.5447, c: 0.0337, h: 257.79)
     )
     static let sparklineGain = DesignToken(
         dark: OKLCH(l: 0.78, c: 0.18, h: 152),
@@ -82,12 +82,12 @@ enum Tokens {
         light: OKLCH(l: 0.56, c: 0.21, h: 22)
     )
     static let accent = DesignToken(
-        dark: OKLCH(l: 0.68, c: 0.16, h: 258),
-        light: OKLCH(l: 0.52, c: 0.17, h: 258)
+        dark: OKLCH(l: 0.757, c: 0.1238, h: 265.3),
+        light: OKLCH(l: 0.5015, c: 0.167, h: 261.57)
     )
     static let accentContrast = DesignToken(
-        dark: OKLCH(l: 0.99, c: 0, h: 0),
-        light: OKLCH(l: 0.99, c: 0, h: 0)
+        dark: OKLCH(l: 0.1859, c: 0.0157, h: 261.55),
+        light: OKLCH(l: 1, c: 0, h: 0)
     )
     static let borderSubtle = DesignToken(
         dark: OKLCH(l: 0.3, c: 0.012, h: 260),

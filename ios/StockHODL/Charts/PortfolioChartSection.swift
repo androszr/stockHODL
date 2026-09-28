@@ -1,11 +1,7 @@
 import SwiftUI
 
-/// The Holdings chart: one header row of controls, one chart.
-///
-/// The layout is `portfolio-value-chart.tsx`'s: the ranges take the
-/// shrinkable half and keep their own horizontal scroll, the Value/Return
-/// toggle takes the fixed half and never shrinks below its tap targets. Two
-/// rows would push the chart itself below the fold on a small phone.
+/// The Holdings chart is disclosed below the positions heading. Its range
+/// and metric controls stay on separate accessible rows when expanded.
 ///
 /// Everything the chart shows is PLN, because the portfolio total is — the
 /// series is summed server-side through the FX the engine already applied, and
@@ -13,28 +9,53 @@ import SwiftUI
 /// implementation. In Return mode there is no currency at all: the axis is a
 /// percentage, which is exactly why `ValueChart` takes a `unit`.
 struct PortfolioChartSection: View {
+    @State private var showsOverview: Bool
     let store: PortfolioChartStore
     /// The user's own trades, already scoped to the selected portfolio by the
     /// screen above — a chart showing one portfolio must never carry another
     /// one's purchases.
     var trades: [TradeMark] = []
 
+    init(store: PortfolioChartStore, trades: [TradeMark] = [], initiallyExpanded: Bool = false) {
+        self.store = store
+        self.trades = trades
+        _showsOverview = State(initialValue: initiallyExpanded)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .center, spacing: 8) {
+        QuietGroup {
+          VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
+            Button {
+                showsOverview.toggle()
+            } label: {
+                HStack {
+                    Text("Portfolio chart")
+                        .font(QuietDesign.TypeRole.section)
+                    Spacer()
+                    Image(systemName: showsOverview ? "chevron.up" : "chevron.down")
+                }
+                .foregroundStyle(Color(Tokens.textPrimary))
+            }
+            .buttonStyle(.plain)
+            .quietHitRegion()
+            .accessibilityLabel(showsOverview ? "Hide portfolio chart" : "Show portfolio chart")
+
+            if showsOverview {
+                Text("Period")
+                    .font(QuietDesign.TypeRole.metadata)
+                    .foregroundStyle(Color(Tokens.textMuted))
                 RangeTabs(selected: store.range) { store.range = $0 }
-                    // The row supplies its own leading inset; inside this card
-                    // the padding is the card's.
                     .padding(.horizontal, -16)
 
+                Text("Metric")
+                    .font(QuietDesign.TypeRole.metadata)
+                    .foregroundStyle(Color(Tokens.textMuted))
                 ChartToggle(
                     selected: store.mode,
                     accessibilityName: "Chart mode"
                 ) { store.mode = $0 }
-                .fixedSize()
-            }
 
-            ValueChart(
+                ValueChart(
                 points: store.points,
                 state: store.state,
                 granularity: store.range.granularity,
@@ -44,23 +65,14 @@ struct PortfolioChartSection: View {
                 emptyMessage: store.emptyMessage,
                 unit: store.mode == .percentReturn ? .percent : .money,
                 mode: store.mode,
-                // The change row lives INSIDE the chart, beneath this one
-                // control row — never inside the `HStack` above, which must
-                // stay one row on the smallest phone.
                 windowLabel: store.range.windowLabel,
-                trades: trades
-                // No `matchOnPrice`: this line is a portfolio TOTAL (or a
-                // return), and a share price has nothing to be nearest to on
-                // it. Markers here place by day alone.
+                trades: trades,
+                plotHeight: 160
+                // A portfolio total has no share price to match on; trade
+                // markers are placed by day.
             )
+            }
+          }
         }
-        .padding(14)
-        .background(Color(Tokens.surface1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(Tokens.borderSubtle), lineWidth: 1)
-        )
-        .accessibilityLabel("Portfolio value chart")
     }
 }

@@ -93,7 +93,7 @@ struct OptionsView: View {
 
     private var loaded: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 12) {
+            LazyVStack(alignment: .leading, spacing: QuietDesign.Space.section) {
                 // The Options tab had `isOffline` and drew nothing for it —
                 // the flag existed, was maintained on every refresh, and no
                 // pixel ever read it. A book of contracts priced an hour ago
@@ -120,6 +120,7 @@ struct OptionsView: View {
                     empty
                 } else {
                     controls
+                    QuietSectionHeading(title: "Contracts")
                     if store.allHidden {
                         // Contracts exist but every one is hidden: say so in
                         // words rather than show an empty grid under a live
@@ -133,14 +134,27 @@ struct OptionsView: View {
 
                 addButton
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, QuietDesign.Space.page)
             .padding(.bottom, 24)
         }
         .refreshable { await store.refresh() }
     }
 
     private var chart: some View {
-        VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
+            QuietSectionHeading(title: "Options value history")
+            Text("Period")
+                .font(QuietDesign.TypeRole.metadata)
+                .foregroundStyle(Color(Tokens.textMuted))
+            RangeTabs(selected: store.range) { store.range = $0 }
+                .padding(.horizontal, -16)
+            Text("Metric")
+                .font(QuietDesign.TypeRole.metadata)
+                .foregroundStyle(Color(Tokens.textMuted))
+            ChartToggle(
+                selected: store.chartMode,
+                accessibilityName: "Chart mode"
+            ) { store.chartMode = $0 }
             ValueChart(
                 points: store.series?.points ?? [],
                 // Decided by the store, which knows which range the points
@@ -165,17 +179,6 @@ struct OptionsView: View {
                 trades: TradeMark.fromLots(store.payload?.items ?? [])
                 // No `matchOnPrice`: the line is a total, not a premium.
             )
-            HStack(alignment: .center, spacing: 8) {
-                RangeTabs(selected: store.range) { store.range = $0 }
-                // Value or Return, display-only: both curves ride in the same
-                // payload, so this never costs a request.
-                ChartToggle(
-                    selected: store.chartMode,
-                    accessibilityName: "Chart mode"
-                ) { store.chartMode = $0 }
-                .fixedSize()
-                .padding(.trailing, 16)
-            }
         }
     }
 

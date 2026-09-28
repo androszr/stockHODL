@@ -15,31 +15,37 @@ import SwiftUI
 /// the PLN value is the largest number because the card answers "what is
 /// this worth" first and "what is the share doing" second.
 struct HoldingCard: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let holding: LiveHolding
     let statics: StaticHolding?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                TickerLogo(symbol: statics?.symbol ?? "", size: 36)
-                identity
-                Spacer(minLength: 0)
-            }
-
-            HStack(alignment: .top, spacing: 12) {
-                priceCluster
-                Spacer(minLength: 8)
-                valueCluster
+        QuietGroup {
+            VStack(alignment: .leading, spacing: QuietDesign.Space.medium) {
+                HStack(alignment: .top, spacing: QuietDesign.Space.medium) {
+                    TickerLogo(symbol: statics?.symbol ?? "", size: 40)
+                    identity
+                }
+                if dynamicTypeSize.isAccessibilitySize {
+                    VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
+                        valueCluster
+                        priceCluster
+                    }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(alignment: .top, spacing: QuietDesign.Space.section) {
+                            valueCluster
+                            Spacer(minLength: 0)
+                            priceCluster
+                        }
+                        VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
+                            valueCluster
+                            priceCluster
+                        }
+                    }
+                }
             }
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(Tokens.surface1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(Tokens.borderSubtle), lineWidth: 1)
-        )
     }
 
     // MARK: - Identity
@@ -63,14 +69,13 @@ struct HoldingCard: View {
                     // truncates while the share count — which changes meaning
                     // if clipped — stays whole.
                     Text(statics.displayName)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text("·")
                     Text(shares(statics.quantity))
                         .monospacedDigit()
-                        .fixedSize()
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .font(.caption)
+                .font(QuietDesign.TypeRole.supporting)
                 .foregroundStyle(Color(Tokens.textMuted))
             }
         }
@@ -104,10 +109,13 @@ struct HoldingCard: View {
 
     private var priceCluster: some View {
         VStack(alignment: .leading, spacing: 1) {
-            HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text("Share price")
+                .font(QuietDesign.TypeRole.metadata)
+                .foregroundStyle(Color(Tokens.textMuted))
+            VStack(alignment: .leading, spacing: QuietDesign.Space.xSmall) {
                 if let price = holding.price {
                     Text(price)
-                        .font(.system(.body, weight: .medium))
+                        .font(QuietDesign.TypeRole.body)
                         .monospacedDigit()
                         .foregroundStyle(Color(Tokens.textPrimary))
 
@@ -115,8 +123,8 @@ struct HoldingCard: View {
                     // omitted with it. An unknown move is simply absent, never
                     // a confident 0,00%.
                     if let day = holding.dayPct {
-                        Text("(\(day.text))")
-                            .font(.system(.subheadline, weight: .medium))
+                        Text("Today \(day.text)")
+                            .font(QuietDesign.TypeRole.supporting)
                             .monospacedDigit()
                             .foregroundStyle(Color(day.direction.token))
                     }
@@ -152,19 +160,15 @@ struct HoldingCard: View {
     // MARK: - Value (rank 1)
 
     private var valueCluster: some View {
-        VStack(alignment: .trailing, spacing: 1) {
+        VStack(alignment: .leading, spacing: QuietDesign.Space.xSmall) {
+            Text("Position value")
+                .font(QuietDesign.TypeRole.metadata)
+                .foregroundStyle(Color(Tokens.textMuted))
             // Tabular figures everywhere a number can change under the user's
             // eyes; without it the column jitters on every tick.
-            Text(holding.valuePLN ?? "—")
-                .font(.system(.title3, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color(Tokens.textPrimary))
+            QuietFinancialValue(text: holding.valuePLN ?? "—")
 
-            Text(holding.unrealizedPct)
-                .font(.subheadline)
-                .monospacedDigit()
-                .foregroundStyle(Color(holding.direction.token))
+            QuietLabeledFigure(label: "Total P/L", value: holding.unrealizedPct, direction: holding.direction)
         }
-        .fixedSize(horizontal: true, vertical: false)
     }
 }

@@ -22,8 +22,8 @@ commits or pushes; releasing is the user's push.
 
 | Workflow | Trigger | Does |
 |---|---|---|
-| `ios.yml` | every PR and push, **no path filter** | regenerates generated Swift (if any) and fails on drift; refuses `Double(` near money, `.minute()`, an ATS exception in a shipping plist, drifted entitlements, a missing privacy string, a drifted keychain group |
-| `testflight.yml` | push to `main` touching `ios/**`, or manual dispatch | selects the newest Xcode and demands Swift 6.2+; writes the ASC key outside the workspace; archives with `CURRENT_PROJECT_VERSION=<run number>`; exports a distribution build; **reads `aps-environment` back from the `.ipa`** and refuses anything but `production`; uploads; shreds the key |
+| `ios.yml` | every PR and push, **no path filter** | runs the guard scripts' own tests; refuses `Double(` near money, `.minute()`, an ATS exception in a shipping plist, drifted entitlements, a keychain group referenced by some files and not others and a missing privacy string (source guards only: no Node, no codegen) |
+| `testflight.yml` | push to `main` touching `ios/**`, or manual dispatch | selects the newest Xcode and demands Swift 6.2+; writes the ASC key outside the workspace; archives with `CURRENT_PROJECT_VERSION=<run number>` and `DEVELOPMENT_TEAM` from the `APPLE_TEAM_ID` secret; exports a distribution build; **reads `aps-environment` back from the `.ipa`** and refuses anything but `production` (skipped while the app declares no push capability); uploads; shreds the key |
 
 `ios.yml` deliberately has no `paths-ignore`: a guard that skips the files it
 guards is decoration. It costs about a minute of Linux on commits that touch
@@ -89,8 +89,10 @@ Do these once per app; the workflow needs nothing else.
 3. **Create an API key**: Users and Access → Integrations → App Store Connect
    API → Team Keys → +, role **App Manager**. Download the `.p8` once (it
    cannot be downloaded again). Note the Key ID and the Issuer ID.
-4. **Store the three secrets** in the GitHub repo: `ASC_PRIVATE_KEY` (the
-   whole `.p8` file contents), `ASC_KEY_ID`, `ASC_ISSUER_ID`.
+4. **Store the four secrets** in the GitHub repo: `ASC_PRIVATE_KEY` (the
+   whole `.p8` file contents), `ASC_KEY_ID`, `ASC_ISSUER_ID`, and
+   `APPLE_TEAM_ID` (the 10-character team id from developer.apple.com →
+   Account → Membership details; the archive step refuses to run without it).
 5. **Export the signing certificates once.** Xcode → Settings → Accounts →
    Manage Certificates → + → Apple Distribution (Apple Development is there
    already). Then Keychain Access → login → My Certificates → ⌘-click both
@@ -115,6 +117,7 @@ Do these once per app; the workflow needs nothing else.
 |---|---|---|
 | GitHub secret | `ASC_PRIVATE_KEY` | archive, export, upload (provisioning) |
 | GitHub secret | `ASC_KEY_ID`, `ASC_ISSUER_ID` | the same |
+| GitHub secret | `APPLE_TEAM_ID` | archive (`DEVELOPMENT_TEAM`; the team id stays out of the repository) |
 | GitHub secret | `IOS_DIST_P12`, `IOS_DIST_P12_PASSWORD` | one .p12 with the Apple Development (archive) and Apple Distribution (export) certificates |
 
 Prefer several small conventional commits with real reasoning in the message

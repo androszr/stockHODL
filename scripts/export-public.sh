@@ -3,12 +3,16 @@
 # publishing, in a folder beside it. The private repository is never touched:
 # nothing here commits, pushes, rewrites history or edits a tracked file.
 #
-#   scripts/export-public.sh [--out DIR] [--dry-run]
+#   scripts/export-public.sh [--out DIR] [--dry-run] [--check-only]
 #
-#   --out DIR   where to build the copy (default: ../stockhodl, a sibling of
-#               this checkout). Refused if DIR exists and is not empty.
-#   --dry-run   build into a fresh temporary folder instead and print its path
-#               at the end; nothing is left beside the checkout.
+#   --out DIR     where to build the copy (default: ../stockhodl, a sibling of
+#                 this checkout). Refused if DIR exists and is not empty.
+#   --dry-run     build into a fresh temporary folder instead and print its
+#                 path at the end; nothing is left beside the checkout. It
+#                 still COMMITS inside that temporary copy.
+#   --check-only  run every check below on the copy, then stop before
+#                 `git init`: no repository, no commit. Combines with either
+#                 of the above; `--dry-run --check-only` is the safe rehearsal.
 #
 # What is copied: every file git tracks or would track (tracked, plus
 # untracked-and-not-ignored) that is present on disk — so a file removed with
@@ -16,15 +20,23 @@
 #
 # Then a forbidden-content scan over the copy. Any hit prints every hit and
 # exits 2 BEFORE `git init`: a leak never reaches a commit. The copy must also
-# carry README.md, LICENSE and SECURITY.md and must not carry plans/,
-# .gitnexus/, .dark-army/, .env, .private-strings or PLAN.md (exit 3 otherwise).
+# carry README.md, LICENSE, SECURITY.md and .gitleaks.toml and must not
+# carry plans/, .gitnexus/, .dark-army/, .env, .private-strings or PLAN.md
+# (exit 3 otherwise).
 #
-# Last, one commit, "Initial public release of StockHODL", authored as
-# EXPORT_AUTHOR_NAME / EXPORT_AUTHOR_EMAIL (default: the GitHub no-reply
-# address, so no personal email lands in the public history).
+# Gitleaks, when installed, scans the copy with the copy's own .gitleaks.toml
+# (built-in rules plus one exact, path-bound allowance for the invented cron
+# test secret), passed explicitly so the result does not depend on where this
+# is run from. With --check-only it is required (exit 4 without it); a normal
+# export without it says the scan was skipped and carries on.
 #
-# Exit codes: 0 built, 1 usage or refused output folder, 2 forbidden content,
-# 3 structural check failed.
+# Last (skipped by --check-only), one commit, "Initial public release of
+# StockHODL", authored as EXPORT_AUTHOR_NAME / EXPORT_AUTHOR_EMAIL (default:
+# the GitHub no-reply address, so no personal email lands in the public
+# history).
+#
+# Exit codes: 0 built (or checked), 1 usage or refused output folder, 2 forbidden content,
+# 3 structural check failed, 4 gitleaks missing under --check-only.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,6 +44,7 @@ ROOT="$(git -C "$ROOT" rev-parse --show-toplevel)"
 
 OUT=""
 DRY_RUN=0
+CHECK_ONLY=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --out)
@@ -43,8 +56,12 @@ while [ $# -gt 0 ]; do
             DRY_RUN=1
             shift
             ;;
+        --check-only)
+            CHECK_ONLY=1
+            shift
+            ;;
         -h|--help)
-            sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'
+            sed -n '2,39p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
             ;;
         *)
@@ -182,10 +199,23 @@ if [ -s "$hits_file" ]; then
 fi
 
 if command -v gitleaks >/dev/null 2>&1; then
-    if ! gitleaks detect --source "$OUT" --no-git >&2; then
+    if [ ! -f "$OUT/.gitleaks.toml" ]; then
+        echo "export-public: .gitleaks.toml is missing from the copy" >&2
+        exit 3
+    fi
+    if ! gitleaks detect --source "$OUT" --no-git --config "$OUT/.gitleaks.toml" >&2; then
         echo "export-public: gitleaks found a secret in the copy — nothing was committed" >&2
         exit 2
     fi
+elif [ "$CHECK_ONLY" -eq 1 ]; then
+    # A rehearsal that skips the secret scan would report a pass it never
+    # checked, which is worse than no rehearsal.
+    echo "export-public: gitleaks is not installed, so the secret scan cannot run — a check-only pass needs it." >&2
+    echo "export-public: install it (brew install gitleaks) or put it on PATH, then run again. Nothing was committed." >&2
+    echo "export-public: the unscanned copy is left at $OUT" >&2
+    exit 4
+else
+    echo "export-public: gitleaks is not installed — the secret scan was SKIPPED; only the pattern scan above ran" >&2
 fi
 
 # --- Structural checks ----------------------------------------------------------
@@ -195,12 +225,19 @@ for must_not in plans docs/research .gitnexus .dark-army .env .private-strings P
         exit 3
     fi
 done
-for must in README.md LICENSE SECURITY.md; do
+for must in README.md LICENSE SECURITY.md .gitleaks.toml; do
     if [ ! -f "$OUT/$must" ]; then
         echo "export-public: $must is missing from the copy" >&2
         exit 3
     fi
 done
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+    echo "export-public: files: $copied"
+    echo "export-public: check-only — every check passed; no repository was created and nothing was committed"
+    echo "export-public: copy: $OUT"
+    exit 0
+fi
 
 # --- One commit ------------------------------------------------------------------
 git -C "$OUT" init -q -b main

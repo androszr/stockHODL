@@ -171,6 +171,74 @@ struct WidgetDataSourceTests {
         #expect(payload.dayLines?.options.first?.p == "-8.92")
     }
 
+    @Test("a widget.json saved by the previous build (no extended key) still opens")
+    func oldCacheFileDecodes() throws {
+        // The shape `AppGroupWidgetCache` wrote before the extended aggregate
+        // existed: the payload has no `extended` key anywhere.
+        let file = "{\"capturedAt\": 1754800000, \"payload\": \(payloadJSON)}"
+        let cached = try JSONDecoder.snapshot.decode(CachedWidgetPayload.self, from: Data(file.utf8))
+        #expect(cached.payload.holdings.extended == nil)
+        #expect(cached.payload.options.extended == nil)
+        #expect(cached.payload.holdings.totalValue == "148 250,00 zł")
+        #expect(cached.capturedAt == Date(timeIntervalSince1970: 1_754_800_000))
+    }
+
+    @Test("a widget.json carrying the extended aggregate decodes with its kind and movers")
+    func newCacheFileDecodes() throws {
+        let file = """
+        {
+          "capturedAt": 1754800000,
+          "payload": {
+            "holdings": {
+              "totalValue": "148 250,00 zł",
+              "dayChange": { "text": "+1 240,00 zł (+0,84%)", "direction": "gain" },
+              "totalChange": { "text": "+18 400,00 zł (+14,20%)", "direction": "gain" },
+              "dayChangePct": "+0,84%",
+              "totalChangePct": "+14,20%",
+              "excludedSymbols": [],
+              "partialDayChange": false,
+              "extended": {
+                "kind": "early",
+                "move": { "text": "+184,62 zł (+0,26%)", "direction": "gain" },
+                "movePct": "+0,26%",
+                "valueAtExtended": "148 434,62 zł",
+                "pricedCount": 6,
+                "holdingsCount": 8,
+                "movers": [
+                  { "symbol": "NVDA", "pct": { "text": "+1,82%", "direction": "gain" } },
+                  { "symbol": "AAPL", "pct": { "text": "+0,54%", "direction": "gain" } },
+                  { "symbol": "XOM", "pct": { "text": "-0,71%", "direction": "loss" } }
+                ]
+              }
+            },
+            "options": {
+              "totalValue": "$3 772.00",
+              "dayChange": { "text": "-$42.00 (-1,10%)", "direction": "loss" },
+              "totalChange": { "text": "+$610.00 (+19,30%)", "direction": "gain" },
+              "dayChangePct": "-1,10%",
+              "totalChangePct": "+19,30%",
+              "excludedSymbols": [],
+              "partialDayChange": false,
+              "extended": null
+            },
+            "market": {
+              "status": "early_trading",
+              "nextTransitionAtMs": null,
+              "nextTransitionKind": null,
+              "pollingResumesAtMs": null,
+              "serverNowMs": 1754800000000
+            }
+          }
+        }
+        """
+        let cached = try JSONDecoder.snapshot.decode(CachedWidgetPayload.self, from: Data(file.utf8))
+        #expect(cached.payload.holdings.extended?.kind == .early)
+        #expect(cached.payload.holdings.extended?.movers.count == 3)
+        #expect(cached.payload.holdings.extended?.pricedCount == 6)
+        #expect(cached.payload.holdings.extended?.valueAtExtended == "148 434,62 zł")
+        #expect(cached.payload.options.extended == nil)
+    }
+
     @Test("it asks the thin widget route, with the bearer token")
     func callsTheWidgetRoute() async {
         let seen = Recorder()

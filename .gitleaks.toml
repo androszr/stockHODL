@@ -1,0 +1,33 @@
+# Gitleaks configuration for this repository and its public export.
+#
+# Every built-in rule stays on (`useDefault`). The one exception below is the
+# invented cron secret the cron-gate tests call themselves with: it is not a
+# credential, and it is published on purpose. Both halves of the allowlist are
+# required together (`condition = "AND"`):
+#
+#   * the extracted secret must be EXACTLY that invented value, so a real
+#     secret pasted over it in the same line is still reported; and
+#   * the file must be exactly src/lib/api/cron/gate.test.ts (at a path
+#     boundary, so an absolute export prefix still matches), so the same value
+#     copied anywhere else is still reported.
+#
+# It is scoped to the one rule that reports it, `generic-api-key`; every other
+# rule still scans that file in full. `scripts/tests/test_public_release.py`
+# runs real Gitleaks against doctored trees to prove each of those three
+# boundaries holds. Never widen this to a folder, a file or an inline
+# `gitleaks:allow` — that would hide whatever replaces the dummy next.
+
+title = "StockHODL"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "The invented cron secret the cron-gate unit tests use (not a credential)"
+condition = "AND"
+regexTarget = "secret"
+paths = ['''(^|/)src/lib/api/cron/gate\.test\.ts$''']
+regexes = ['''^a-cron-secret-of-at-least-16-chars$''']

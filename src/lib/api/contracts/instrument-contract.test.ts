@@ -143,13 +143,14 @@ describe('the instrument payload carries the fallback price and the stats row', 
       ...base,
       targetStatus: {
         text: '3,26%',
-        sentence: '3,26% below your 190,00 USD line',
+        sentence: 'Needs to rise 3,26% to reach your 190,00 USD line',
         side: 'below',
         near: true,
         hitOnly: false,
+        targetShort: '190',
       },
     });
-    expect(parsed.targetStatus?.sentence).toContain('below your');
+    expect(parsed.targetStatus?.sentence).toContain('to reach your');
 
     // Required-nullable, like priceTargets: an answer without it is a
     // producer bug, not an old shape.

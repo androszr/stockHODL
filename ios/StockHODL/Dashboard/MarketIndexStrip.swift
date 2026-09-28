@@ -34,6 +34,9 @@ struct MarketIndexStrip: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            Text("Markets · trend: last 5 sessions")
+                .font(QuietDesign.TypeRole.metadata)
+                .foregroundStyle(Color(Tokens.textMuted))
             HStack(spacing: 8) {
                 ForEach(tiles, id: \.proxySymbol) { tile in
                     NavigationLink(value: Route.marketDetail(tile.key)) {
@@ -51,6 +54,9 @@ struct MarketIndexStrip: View {
                     .accessibilityAddTraits(.isButton)
                 }
             }
+            // Equal-height tiles: the row takes its tallest tile's height and
+            // every `TileFrame` stretches to it, so the lights line up.
+            .fixedSize(horizontal: false, vertical: true)
 
             // Smaller chrome than `StaleBar` deliberately: the Dashboard
             // already carries the holdings' bar above this, and two full-width
@@ -74,7 +80,7 @@ struct IndexTileView: View {
     var body: some View {
         TileFrame {
             Text(tile.indexName)
-                .font(.system(.caption, weight: .semibold))
+                .font(QuietDesign.TypeRole.tileTitle)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .foregroundStyle(Color(Tokens.textPrimary))
@@ -88,15 +94,13 @@ struct IndexTileView: View {
                 .minimumScaleFactor(0.8)
                 .foregroundStyle(Color(Tokens.textMuted))
 
-            Sparkline(points: tile.spark, direction: tile.dayPct?.direction ?? .neutral)
-
             TilePrice(price: tile.last)
 
             // The SIGN is the non-colour carrier of direction — the server's
             // `fmtPct` writes it, and it is there whether or not the colour is
             // perceivable. `TickerTile.sessionLine`'s else-branch, verbatim.
             Text(tile.dayPct?.text ?? "—")
-                .font(.system(size: 11))
+                .font(QuietDesign.TypeRole.tileFigure)
                 .monospacedDigit()
                 .lineLimit(1)
                 .foregroundStyle(
@@ -105,6 +109,7 @@ struct IndexTileView: View {
 
             // The same five-session lights every holding's tile draws, on the
             // proxy's daily closes (2026-09-21).
+            Spacer(minLength: 0)
             TrendLights(days: tile.trend)
         }
         // One element, not five: a tile is a single thing to a screen reader,
@@ -145,7 +150,7 @@ struct CurrencyTileView: View {
     var body: some View {
         TileFrame {
             Text(tile.pairLabel)
-                .font(.system(.caption, weight: .semibold))
+                .font(QuietDesign.TypeRole.tileTitle)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .foregroundStyle(Color(Tokens.textPrimary))
@@ -156,12 +161,10 @@ struct CurrencyTileView: View {
                 .minimumScaleFactor(0.8)
                 .foregroundStyle(Color(Tokens.textMuted))
 
-            Sparkline(points: tile.spark, direction: tile.dayPct?.direction ?? .neutral)
-
             TilePrice(price: tile.last)
 
             Text(tile.dayPct?.text ?? "—")
-                .font(.system(size: 11))
+                .font(QuietDesign.TypeRole.tileFigure)
                 .monospacedDigit()
                 .lineLimit(1)
                 .foregroundStyle(
@@ -170,6 +173,7 @@ struct CurrencyTileView: View {
 
             // Five UTC-day lights on the pair's daily closes, graded on the
             // server's FX bands rather than the equity ones.
+            Spacer(minLength: 0)
             TrendLights(days: tile.trend)
         }
         .accessibilityElement(children: .combine)

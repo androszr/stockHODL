@@ -42,7 +42,12 @@ struct DashboardView: View {
     /// below and refreshed with the pull. Optional so fakes stay constructible
     /// with no history at all.
     let dayReportHistory: DayReportHistoryStore?
+    /// Switches the shell to the Holdings tab — the extended-hours box's tap.
+    /// The shell owns the tab selection, so this view only asks. Nil keeps
+    /// the box a plain, untappable readout (fakes, previews).
+    var onOpenHoldings: (() -> Void)? = nil
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     /// The Dashboard's OWN remembered ordering — separate from the Holdings
     /// list's, because the two screens are asked different questions: a
     /// dashboard is scanned by size, a list is often read by name.
@@ -121,33 +126,43 @@ struct DashboardView: View {
 
     private var loaded: some View {
         ScrollView {
-            LazyVStack(spacing: 8) {
+            LazyVStack(spacing: QuietDesign.Space.medium) {
                 // The Dashboard reads `LiveStore` like Holdings does, and so
                 // owes the same disclosure. It drew none: the tab that showed
                 // the day's mood was the one tab that never admitted the mood
                 // was yesterday's.
                 StaleBar(freshness: store.freshness)
 
-                if let market = store.live?.market {
-                    MarketStatusBar(market: market)
-                }
-
-                // Above the totals and OUTSIDE the empty-state branch: the
-                // market's mood is not conditional on owning anything, and a
-                // first-run dashboard is exactly where it is most worth
-                // reading. Absent until the first payload lands — a skeleton
-                // here would hold space above someone's money for a row that
-                // is decoration.
-                marketStripRow
-
                 if store.tiles.isEmpty {
                     empty
                 } else {
                     if let summary = store.live?.summary {
-                        SummaryHeader(summary: summary)
+                        SummaryHeader(summary: summary, title: "All portfolios · holdings")
+                        // Only while a pre-market or after-hours session is
+                        // live: the server sends the aggregate then and null
+                        // otherwise, so the box vanishes at 09:30 and 20:00
+                        // with no clock on the phone. The header above stays
+                        // on the regular session.
+                        if let extended = summary.extended {
+                            // "live" only when the StaleBar above has nothing
+                            // to disclose — the same freshness notion.
+                            ExtendedSummaryBox(
+                                extended: extended,
+                                isFresh: !store.freshness.needsDisclosure,
+                                onTap: onOpenHoldings
+                            )
+                        }
                     }
+                }
 
+                if let market = store.live?.market {
+                    MarketStatusBar(market: market, compact: true)
+                }
+                marketStripRow
+
+                if !store.tiles.isEmpty {
                     HStack {
+                        QuietSectionHeading(title: "Holdings")
                         Spacer(minLength: 0)
                         SortMenu(selected: sort) { picked in
                             sort = picked
@@ -161,7 +176,7 @@ struct DashboardView: View {
                 optionsSection
                 dayReportHistorySection
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, QuietDesign.Space.page)
             .padding(.bottom, 24)
         }
         // Pull-to-refresh moves EVERY figure on the screen. The strip has its
@@ -179,18 +194,19 @@ struct DashboardView: View {
         }
     }
 
+    /// The tile GRID: `.adaptive` packs as many columns as fit (four on
+    /// every supported iPhone at default text size), so a whole book reads
+    /// in one glance. Accessibility text sizes widen the column minimum
+    /// rather than squeezing large type into a 76 pt cell.
+    private var tileColumns: [GridItem] {
+        TileGrid.columns(isAccessibilitySize: dynamicTypeSize.isAccessibilitySize)
+    }
+
     private var grid: some View {
-        // `.adaptive(minimum:)` is SwiftUI's answer to the web's
-        // `repeat(auto-fill, minmax(4.75rem, 1fr))` — the row packs as many
-        // 76pt columns as fit, so the tile is identical at every width and no
-        // breakpoint branch exists on either client.
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 76), spacing: 8)],
-            spacing: 8
-        ) {
+        LazyVGrid(columns: tileColumns, spacing: QuietDesign.Space.small) {
             ForEach(sorted, id: \.statics.instrumentId) { row in
                 NavigationLink(value: Route.instrument(row.statics.symbol)) {
-                    TickerTile(
+                    TickerGridTile(
                         symbol: row.statics.symbol,
                         displayName: row.statics.displayName,
                         price: row.live?.price,
@@ -242,7 +258,7 @@ struct DashboardView: View {
         if let options, options.isLoading, options.payload == nil {
             OptionsSectionSkeleton()
         } else if let options, !visibleOptions.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: QuietDesign.Space.medium) {
                 // The options book gets the SAME box the holdings total has —
                 // value, today, total, five-session lights — above its grid,
                 // in place of the inline figure the header used to carry
@@ -256,11 +272,8 @@ struct DashboardView: View {
                     .padding(.bottom, 8)
                 }
 
-                Text("Options")
-                    .font(.system(.subheadline, weight: .semibold))
-                    .foregroundStyle(Color(Tokens.textPrimary))
-
                 HStack {
+                    QuietSectionHeading(title: "Options")
                     Spacer(minLength: 0)
                     SortMenu(selected: optionsSort) { picked in
                         optionsSort = picked
@@ -268,11 +281,7 @@ struct DashboardView: View {
                     }
                 }
 
-                // The stock grid's exact template — width-identical tiles.
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 76), spacing: 8)],
-                    spacing: 8
-                ) {
+                LazyVGrid(columns: tileColumns, spacing: QuietDesign.Space.small) {
                     ForEach(visibleOptions, id: \.key) { item in
                         NavigationLink(value: Route.optionContract(item.key)) {
                             OptionTile(item: item)

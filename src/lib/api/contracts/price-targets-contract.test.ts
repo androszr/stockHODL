@@ -86,10 +86,11 @@ describe('priceTargetCreateRequestSchema', () => {
 
 const STATUS = {
   text: '3,26%',
-  sentence: '3,26% below your 190,00 USD line',
+  sentence: 'Needs to rise 3,26% to reach your 190,00 USD line',
   side: 'below',
   near: true,
   hitOnly: false,
+  targetShort: '190',
 };
 
 describe('targetStatusSchema', () => {
@@ -108,8 +109,18 @@ describe('targetStatusSchema', () => {
         side: null,
         near: false,
         hitOnly: true,
+        targetShort: null,
       }).hitOnly,
     ).toBe(true);
+  });
+
+  it('carries the short target price as a string, or null', () => {
+    expect(targetStatusSchema.parse(STATUS).targetShort).toBe('190');
+    expect(targetStatusSchema.parse({ ...STATUS, targetShort: '167,70' }).targetShort).toBe(
+      '167,70',
+    );
+    expect(targetStatusSchema.parse({ ...STATUS, targetShort: null }).targetShort).toBeNull();
+    expect(targetStatusSchema.safeParse({ ...STATUS, targetShort: 190 }).success).toBe(false);
   });
 
   it('refuses a side outside the closed pair — the display Direction enum is a different thing', () => {

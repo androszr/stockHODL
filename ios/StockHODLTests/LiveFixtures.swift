@@ -49,6 +49,7 @@ enum LiveFixture {
             // spells it the same way.
             dayChangePct: "+1,20%",
             excludedSymbols: excluded,
+            extended: nil,
             partialDayChange: partial,
             totalChange: figure("+5,40%"),
             totalChangePct: "+5,40%",

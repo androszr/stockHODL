@@ -41,26 +41,20 @@ struct OptionCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        QuietGroup {
+          VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
             header
             priceRow
             figures
             if !item.hasQuote {
                 Text("No quote yet — live figures show as dashes.")
-                    .font(.caption)
+                    .font(QuietDesign.TypeRole.metadata)
                     .foregroundStyle(Color(Tokens.textMuted))
                     .padding(.top, 8)
             }
             greeks
+          }
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 12).fill(Color(Tokens.surface1))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(Tokens.borderSubtle), lineWidth: 1)
-        )
     }
 
     // MARK: - Header
@@ -80,7 +74,7 @@ struct OptionCardView: View {
                 // stands for more than one purchase, and says so — an average
                 // printed as if it were a paid price would be a quiet lie.
                 Text(entryLine)
-                    .font(.caption)
+                    .font(QuietDesign.TypeRole.metadata)
                     .monospacedDigit()
                     .foregroundStyle(Color(Tokens.textMuted))
             }
@@ -96,7 +90,7 @@ struct OptionCardView: View {
             if item.expired {
                 Text("Expired \(item.expiryLabel)")
                 Text("Expired")
-                    .font(.system(size: 11, weight: .medium))
+                    .font(QuietDesign.TypeRole.metadata)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
                     .overlay(Capsule().stroke(Color(Tokens.borderSubtle), lineWidth: 1))
@@ -105,7 +99,7 @@ struct OptionCardView: View {
                 Text("Expires \(item.expiryLabel) · \(daysLeftLabel)")
             }
         }
-        .font(.caption)
+        .font(QuietDesign.TypeRole.metadata)
         .foregroundStyle(Color(Tokens.textMuted))
     }
 

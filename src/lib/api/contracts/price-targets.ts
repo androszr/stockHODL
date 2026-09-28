@@ -63,7 +63,7 @@ export type TargetSideContract = z.output<typeof targetSideSchema>;
  *
  * Both strings are server-formatted (non-negotiable #1): `text` is the
  * compact unsigned distance for a tile ("3,21%", "Hit", "—"), `sentence` the
- * full readout ("3,21% below your 190,00 USD line") — also the accessibility
+ * full readout ("Needs to rise 3,21% to reach your 190,00 USD line") — also the accessibility
  * label, so the state is words, never a glyph or a color alone.
  */
 export const targetStatusSchema = z.object({
@@ -77,6 +77,11 @@ export const targetStatusSchema = z.object({
   /** Every line this instrument has was already hit — files under "No
    *  target", but the tile says "Hit" so the history is not invisible. */
   hitOnly: z.boolean(),
+  /** The nearest waiting line's price without currency, for a tile's
+   *  compact "to 110" suffix — "110" for a whole target, "167,70" otherwise.
+   *  Null for hit-only and unpriced statuses. Nullable so a payload from
+   *  before the field existed still decodes on the phone. */
+  targetShort: displayStringSchema.nullable(),
 });
 
 export type TargetStatusContract = z.output<typeof targetStatusSchema>;

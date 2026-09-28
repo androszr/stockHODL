@@ -33,7 +33,7 @@ struct DayReportView: View {
         VStack(spacing: 0) {
             StaleBar(freshness: store.freshness)
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
+                LazyVStack(alignment: .leading, spacing: QuietDesign.Space.section) {
                     dayHeader(view)
                     kindPicker
                     // One report for everything the owner holds — no
@@ -59,7 +59,7 @@ struct DayReportView: View {
                     events(view)
                     NarrativeSection(narrative: view.narrative)
                 }
-                .padding(16)
+                .padding(QuietDesign.Space.page)
             }
             .refreshable { await store.reload() }
         }
@@ -68,12 +68,12 @@ struct DayReportView: View {
     private func dayHeader(_ view: DayReportResponse) -> some View {
         ViewThatFits(in: .horizontal) {
             HStack {
-                Text(view.dayLabel).font(.title3.weight(.semibold))
+                Text(view.dayLabel).font(QuietDesign.TypeRole.screen)
                 Spacer()
                 arrows(view)
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(view.dayLabel).font(.title3.weight(.semibold))
+                Text(view.dayLabel).font(QuietDesign.TypeRole.screen)
                 arrows(view)
             }
         }
@@ -120,11 +120,9 @@ struct DayReportView: View {
 
     private func morningCard(_ view: DayReportResponse) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Yesterday's close").font(.caption).foregroundStyle(Color(Tokens.textMuted))
+            Text("Yesterday's close").font(QuietDesign.TypeRole.supporting).foregroundStyle(Color(Tokens.textMuted))
             if let recap = view.recap {
-                Text(recap.dayChange.text)
-                    .font(.title2.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(Color(recap.dayChange.direction.token))
+                QuietFinancialValue(text: recap.dayChange.text, prominent: true, direction: recap.dayChange.direction)
                 if let pct = recap.dayChangePct { Text(pct).font(.subheadline.monospacedDigit()) }
             } else {
                 Text("No closing recap available").foregroundStyle(Color(Tokens.textMuted))
@@ -136,12 +134,10 @@ struct DayReportView: View {
     private func closeCard(_ view: DayReportResponse) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let value = view.figures.valueAtClose {
-                Text(value).font(.caption).foregroundStyle(Color(Tokens.textMuted))
+                Text(value).font(QuietDesign.TypeRole.supporting).foregroundStyle(Color(Tokens.textMuted))
             }
             if let change = view.figures.dayChange {
-                Text(Self.headline(change.text, partial: view.figures.partial))
-                    .font(.title2.weight(.semibold).monospacedDigit())
-                    .foregroundStyle(Color(change.direction.token))
+                QuietFinancialValue(text: Self.headline(change.text, partial: view.figures.partial), prominent: true, direction: change.direction)
                 if let pct = view.figures.dayChangePct { Text(pct).font(.subheadline.monospacedDigit()) }
             }
             if let holdings = view.figures.holdings?.dayChange {
@@ -338,7 +334,7 @@ struct DayReportView: View {
 private extension View {
     func cardStyle() -> some View {
         self
-            .padding(16)
-            .background(Color(Tokens.surface1), in: RoundedRectangle(cornerRadius: 14))
+            .padding(QuietDesign.Space.group)
+            .background(Color(Tokens.surface1), in: RoundedRectangle(cornerRadius: QuietDesign.Radius.group))
     }
 }

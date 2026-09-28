@@ -93,6 +93,7 @@ struct WatchlistSectionsTests {
             near: false,
             sentence: "Your 190,00 USD line has been hit",
             side: nil,
+            targetShort: nil,
             text: "Hit"
         )
         let sections = WatchlistSections.build(

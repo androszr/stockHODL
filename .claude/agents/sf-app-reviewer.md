@@ -41,12 +41,15 @@ and **a persisted file from the previous build blanking a screen**.
 
 ### The distribution build
 - Debug and Release entitlements identical except `aps-environment`
-  (`development` / `production`). Any other difference is `BLOCK`.
+  (`development` / `production`) — optional; an app with no push carries it
+  in neither, and that is not a difference. Present in one and not the
+  other, or with the wrong value, is `BLOCK`, as is any other difference.
 - No `NSAppTransportSecurity` in a shipping plist (`Info.plist`,
   `Info-<Extension>.plist`); the exception lives in the `-Debug` twin only.
   `BLOCK`.
 - `ExportOptions.plist` still names the team and `app-store-connect`; the
-  workflow still reads `aps-environment` back from the exported `.ipa`.
+  workflow still reads `aps-environment` back from the exported `.ipa`
+  (it skips the read-back while the Release entitlements declare no push).
 - A new build setting referenced from a plist (`$(SOMETHING)`) is defined in
   every xcconfig that builds that target. An undefined one expands to an
   empty string with no warning.

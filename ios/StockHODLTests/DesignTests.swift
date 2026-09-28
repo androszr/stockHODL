@@ -13,6 +13,60 @@ private func pngBytes() -> Data {
     }
 }
 
+@Suite("Quiet Precision contrast")
+struct QuietPrecisionContrastTests {
+    private func luminance(_ token: DesignToken, _ scheme: TokenScheme) -> Double {
+        let rgb = token.value(for: scheme).linearSRGB
+        let red = min(1, max(0, rgb.red))
+        let green = min(1, max(0, rgb.green))
+        let blue = min(1, max(0, rgb.blue))
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+    }
+
+    private func contrast(_ foreground: DesignToken, _ background: DesignToken, _ scheme: TokenScheme) -> Double {
+        let a = luminance(foreground, scheme)
+        let b = luminance(background, scheme)
+        return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+    }
+
+    @Test("financial labels and selected controls remain readable in both appearances")
+    func semanticPairs() {
+        for scheme in [TokenScheme.dark, .light] {
+            for foreground in [Tokens.textPrimary, Tokens.textSecondary, Tokens.textMuted, Tokens.gain, Tokens.loss] {
+                #expect(contrast(foreground, Tokens.surface1, scheme) >= 4.5)
+            }
+            #expect(contrast(Tokens.accentContrast, Tokens.accent, scheme) >= 4.5)
+        }
+    }
+}
+
+@MainActor
+@Suite("Stock row session speech")
+struct StockRowSessionSpeechTests {
+    @Test("cached prices take precedence over extended and regular day moves")
+    func cachedPrice() {
+        let cached = CachedPrice(asOfMs: 1_700_000_000_000, text: "123,45 USD")
+        let extended = ExtendedFigure(direction: .gain, endedAtMs: nil, kind: .late,
+                                      live: true, text: "+2,00%")
+        let day = LiveFigure(direction: .loss, text: "−1,00%")
+        let speech = TickerTile.spokenSession(cached: cached, extended: extended, dayPct: day)
+        #expect(speech.contains("cached at"))
+        #expect(!speech.contains("after hours"))
+        #expect(!speech.contains("today"))
+    }
+
+    @Test("extended and day moves are named for their actual session")
+    func sessionKinds() {
+        let day = LiveFigure(direction: .gain, text: "+1,00%")
+        let extended = ExtendedFigure(direction: .loss, endedAtMs: nil, kind: .late,
+                                      live: false, text: "−2,00%")
+        let afterHours = TickerTile.spokenSession(cached: nil, extended: extended, dayPct: day)
+        #expect(afterHours.contains("after hours −2,00%, closed session"))
+        #expect(!afterHours.contains("today"))
+        #expect(TickerTile.spokenSession(cached: nil, extended: nil, dayPct: day) == ", today +1,00%")
+    }
+}
+
 /// Every case here passes `NoImageDisk()` deliberately: this suite is about
 /// the in-memory half — what is asked for twice, what is remembered, what is
 /// not — and a real cache directory would carry one case's PNG into the next

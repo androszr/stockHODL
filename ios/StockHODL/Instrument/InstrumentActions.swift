@@ -22,12 +22,16 @@ import SwiftUI
 /// toggle is in flight so an optimistic tap cannot re-fire mid-save.
 struct WatchActionModel: Equatable {
     let systemImage: String
+    /// The visible word. It always begins with the spoken name "Watch", so a
+    /// Voice Control user can say what they see; the state rides the value.
+    let title: String
     let accessibilityValue: String
     let isDisabled: Bool
 
     static func current(isWatched: Bool, isToggling: Bool) -> WatchActionModel {
         WatchActionModel(
             systemImage: isWatched ? "binoculars.fill" : "binoculars",
+            title: isWatched ? "Watching" : "Watch",
             accessibilityValue: isWatched ? "Watching" : "Not watching",
             isDisabled: isToggling
         )
@@ -47,28 +51,37 @@ struct InstrumentActionButtons: View {
     let onAddTransaction: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: QuietDesign.Space.small) {
+            actions
+          }
+          VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
+            actions
+          }
+        }
+    }
+
+    @ViewBuilder
+    private var actions: some View {
             Button(action: onToggleWatch) {
-                Image(systemName: model.systemImage)
-                    .font(.system(size: 17, weight: .semibold))
+                Label(model.title, systemImage: model.systemImage)
+                    .font(QuietDesign.TypeRole.supporting)
                     .foregroundStyle(Color(Tokens.accent))
-                    .frame(width: 44, height: 44)
-                    .contentShape(Rectangle())
+                    .quietHitRegion()
             }
             .disabled(model.isDisabled)
             .accessibilityLabel("Watch")
             .accessibilityValue(model.accessibilityValue)
+            .accessibilityInputLabels(["Watch", model.title])
 
             if showsAddTransaction {
                 Button(action: onAddTransaction) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 17, weight: .semibold))
+                    Label("Add a transaction", systemImage: "plus")
+                        .font(QuietDesign.TypeRole.supporting)
                         .foregroundStyle(Color(Tokens.accent))
-                        .frame(width: 44, height: 44)
-                        .contentShape(Rectangle())
+                        .quietHitRegion()
                 }
                 .accessibilityLabel("Add a transaction")
             }
-        }
     }
 }

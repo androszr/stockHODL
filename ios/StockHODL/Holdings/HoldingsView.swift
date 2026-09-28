@@ -129,11 +129,11 @@ struct HoldingsView: View {
             )
 
             ScrollView {
-                LazyVStack(spacing: 8) {
+                LazyVStack(spacing: QuietDesign.Space.medium) {
                     // Market state first, summary second: whether the figures
                     // are moving decides how much the figures mean.
                     if let market = store.live?.market {
-                        MarketStatusBar(market: market)
+                        MarketStatusBar(market: market, compact: true)
                     }
 
                     if let summary = store.visibleSummary {
@@ -144,28 +144,9 @@ struct HoldingsView: View {
                         PortfolioChartSection(store: chart, trades: scopedTrades)
                     }
 
-                    // Transactions, Dividends, Analytics and News live here
-                    // rather than in the tab bar for the same reason they
-                    // light no tab on the web: all four slots are taken, and
-                    // what you bought, what it paid, how it performed and
-                    // what is being written about it all belong next to what
-                    // you hold. One compact row, so the first holding is a
-                    // swipe away instead of several.
-                    LazyVGrid(
-                        columns: [GridItem(.adaptive(minimum: 70), spacing: 8)],
-                        spacing: 8
-                    ) {
-                        ForEach(HoldingsNavDestination.allCases, id: \.self) { destination in
-                            NavigationLink(value: destination.route) {
-                                NavTile(
-                                    title: destination.title,
-                                    systemImage: destination.systemImage
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
+                    if !sortedHoldings.isEmpty {
+                        QuietSectionHeading(title: "Positions")
                     }
-                    .padding(.bottom, 4)
 
                     ForEach(sortedHoldings, id: \.instrumentId) { holding in
                         let statics = store.staticHolding(for: holding)
@@ -214,8 +195,33 @@ struct HoldingsView: View {
                         )
                         .padding(.top, 48)
                     }
+                    QuietSectionHeading(title: "More")
+                    // Transactions, Dividends, Analytics and News live here
+                    // rather than in the tab bar for the same reason they
+                    // light no tab on the web: all four slots are taken, and
+                    // what you bought, what it paid, how it performed and
+                    // what is being written about it all belong next to what
+                    // you hold. One compact row, so the first holding is a
+                    // swipe away instead of several.
+                    LazyVGrid(
+                        columns: [GridItem(.adaptive(minimum: 70), spacing: 8)],
+                        spacing: 8
+                    ) {
+                        ForEach(HoldingsNavDestination.allCases, id: \.self) { destination in
+                            NavigationLink(value: destination.route) {
+                                NavTile(
+                                    title: destination.title,
+                                    systemImage: destination.systemImage
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.bottom, 4)
+
+
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, QuietDesign.Space.page)
                 .padding(.bottom, 24)
             }
             // Pull to refresh stays available even when the cadence is off,

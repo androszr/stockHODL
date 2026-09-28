@@ -419,6 +419,7 @@ struct LiveSummary: Codable, Sendable {
     let dayChange: LiveFigure?
     let dayChangePct: String?
     let excludedSymbols: [String]
+    let extended: LiveExtendedSummary?
     let partialDayChange: Bool
     let totalChange: LiveFigure?
     let totalChangePct: String?
@@ -429,11 +430,44 @@ struct LiveSummary: Codable, Sendable {
         case dayChange = "dayChange"
         case dayChangePct = "dayChangePct"
         case excludedSymbols = "excludedSymbols"
+        case extended = "extended"
         case partialDayChange = "partialDayChange"
         case totalChange = "totalChange"
         case totalChangePct = "totalChangePct"
         case totalValue = "totalValue"
         case trend = "trend"
+    }
+}
+
+// MARK: - LiveExtendedSummary
+struct LiveExtendedSummary: Codable, Sendable {
+    let holdingsCount: Int
+    let kind: ExtendedSessionKind
+    let move: LiveFigure
+    let movePct: String?
+    let movers: [LiveExtendedMover]
+    let pricedCount: Int
+    let valueAtExtended: String
+
+    enum CodingKeys: String, CodingKey {
+        case holdingsCount = "holdingsCount"
+        case kind = "kind"
+        case move = "move"
+        case movePct = "movePct"
+        case movers = "movers"
+        case pricedCount = "pricedCount"
+        case valueAtExtended = "valueAtExtended"
+    }
+}
+
+// MARK: - LiveExtendedMover
+struct LiveExtendedMover: Codable, Sendable {
+    let pct: LiveFigure
+    let symbol: String
+
+    enum CodingKeys: String, CodingKey {
+        case pct = "pct"
+        case symbol = "symbol"
     }
 }
 
@@ -1425,6 +1459,7 @@ struct TargetStatus: Codable, Sendable {
     let near: Bool
     let sentence: String
     let side: TargetSide?
+    let targetShort: String?
     let text: String
 
     enum CodingKeys: String, CodingKey {
@@ -1432,6 +1467,7 @@ struct TargetStatus: Codable, Sendable {
         case near = "near"
         case sentence = "sentence"
         case side = "side"
+        case targetShort = "targetShort"
         case text = "text"
     }
 }

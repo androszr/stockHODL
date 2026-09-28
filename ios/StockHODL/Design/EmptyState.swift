@@ -24,11 +24,11 @@ struct EmptyState: View {
             }
 
             Text(title)
-                .font(.system(.body, weight: .medium))
+                .font(QuietDesign.TypeRole.section)
                 .foregroundStyle(Color(Tokens.textPrimary))
 
             Text(explanation)
-                .font(.subheadline)
+                .font(QuietDesign.TypeRole.supporting)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(Color(Tokens.textMuted))
 
@@ -45,8 +45,8 @@ struct EmptyState: View {
 
     private func button(_ action: Action) -> some View {
         Button(action.label, action: action.run)
-            .font(.subheadline)
+            .font(QuietDesign.TypeRole.supporting)
             .foregroundStyle(Color(Tokens.accent))
-            .frame(minHeight: 44)
+            .quietHitRegion()
     }
 }

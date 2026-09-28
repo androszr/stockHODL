@@ -67,9 +67,17 @@ export function quoteStreamResponse(
   { status, pollingResumesAtMs, hasPollableSymbols, quotes, compose }: QuoteStreamOptions,
 ): Response {
   // Fully closed or structurally nothing to stream: say so and end — no
-  // vendor socket, no background traffic until the next session.
+  // vendor socket, no background traffic until the next session. The fresh
+  // baseline payload goes FIRST: a client that reconnects at 20:00 New York
+  // still holds the last after-hours frame (its `summary.extended` non-null),
+  // and `idle` alone would stop its pump with that frame on screen for the
+  // rest of the night. The closed composition carries `extendedLive: false`,
+  // so its `summary.extended` is null and the extended-hours box goes away
+  // (plans/2026-09-28-watchlist-grid-extended-hours.md).
   if (!shouldPollQuotes(status, hasPollableSymbols)) {
-    return new Response(sse('idle', { pollingResumesAtMs }), { headers: SSE_HEADERS });
+    return new Response(sse('payload', compose(quotes)) + sse('idle', { pollingResumesAtMs }), {
+      headers: SSE_HEADERS,
+    });
   }
 
   const encoder = new TextEncoder();

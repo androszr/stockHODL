@@ -416,7 +416,10 @@ struct SignedInView: View {
                     store: live,
                     options: options,
                     marketStrip: marketStrip,
-                    dayReportHistory: dayReportHistory
+                    dayReportHistory: dayReportHistory,
+                    // The extended-hours box's tap — the same tab switch the
+                    // push handler above performs.
+                    onOpenHoldings: { tab = .holdings }
                 )
             } else {
                 Color(Tokens.surface0)

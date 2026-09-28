@@ -16,25 +16,25 @@ struct NavRow: View {
     var detail: String?
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: QuietDesign.Space.small) {
             Image(systemName: systemImage)
             Text(title)
             Spacer(minLength: 0)
             if let detail {
                 Text(detail)
-                    .font(.caption)
+                    .font(QuietDesign.TypeRole.metadata)
                     .monospacedDigit()
                     .foregroundStyle(Color(Tokens.textMuted))
             }
             Image(systemName: "chevron.right")
                 .font(.caption)
         }
-        .font(.subheadline)
+        .font(QuietDesign.TypeRole.supporting)
         .foregroundStyle(Color(Tokens.textSecondary))
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(QuietDesign.Space.group)
+        .frame(minHeight: 44)
         .background(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: QuietDesign.Radius.group)
                 .fill(Color(Tokens.surface1))
         )
     }

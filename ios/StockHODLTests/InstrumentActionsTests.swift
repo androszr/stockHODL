@@ -11,6 +11,7 @@ struct InstrumentActionsTests {
     func notWatchingIdle() {
         let model = WatchActionModel.current(isWatched: false, isToggling: false)
         #expect(model.systemImage == "binoculars")
+        #expect(model.title == "Watch")
         #expect(model.accessibilityValue == "Not watching")
         #expect(!model.isDisabled)
     }
@@ -19,6 +20,7 @@ struct InstrumentActionsTests {
     func watchingIdle() {
         let model = WatchActionModel.current(isWatched: true, isToggling: false)
         #expect(model.systemImage == "binoculars.fill")
+        #expect(model.title == "Watching")
         #expect(model.accessibilityValue == "Watching")
         #expect(!model.isDisabled)
     }

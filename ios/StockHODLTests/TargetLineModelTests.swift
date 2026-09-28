@@ -10,12 +10,16 @@ import Testing
 struct TargetLineModelTests {
     private func status(
         text: String = "3,21%",
-        sentence: String = "3,21% below your 190,00 USD line",
+        sentence: String = "Needs to rise 3,21% to reach your 190,00 USD line",
         side: TargetSide? = .below,
         near: Bool = true,
-        hitOnly: Bool = false
+        hitOnly: Bool = false,
+        targetShort: String? = "190"
     ) -> TargetStatus {
-        TargetStatus(hitOnly: hitOnly, near: near, sentence: sentence, side: side, text: text)
+        TargetStatus(
+            hitOnly: hitOnly, near: near, sentence: sentence, side: side,
+            targetShort: targetShort, text: text
+        )
     }
 
     @Test("no status means no marker at all — the Dashboard path")
@@ -55,7 +59,8 @@ struct TargetLineModelTests {
                 sentence: "Your 190,00 USD line has been hit",
                 side: nil,
                 near: false,
-                hitOnly: true
+                hitOnly: true,
+                targetShort: nil
             )
         )
         #expect(model?.glyph == "checkmark")
@@ -73,6 +78,37 @@ struct TargetLineModelTests {
     @Test("the spoken label is the server's full sentence — words, never a glyph or color alone")
     func accessibilityLabelIsTheSentence() {
         let model = TargetLineModel.from(status())
-        #expect(model?.accessibilityLabel == "3,21% below your 190,00 USD line")
+        #expect(model?.accessibilityLabel == "Needs to rise 3,21% to reach your 190,00 USD line")
+    }
+
+    @Test("the fall sentence reaches the spoken label verbatim")
+    func fallSentence() {
+        let model = TargetLineModel.from(
+            status(
+                text: "26,02%",
+                sentence: "Needs to fall 26,02% to reach your 110,00 USD line",
+                side: .above,
+                near: false,
+                targetShort: "110"
+            )
+        )
+        #expect(model?.accessibilityLabel == "Needs to fall 26,02% to reach your 110,00 USD line")
+        #expect(model?.arrow == "arrow.down.right")
+    }
+
+    @Test("the short target price becomes the tile's \" to …\" suffix")
+    func suffixFromTargetShort() {
+        #expect(TargetLineModel.from(status(targetShort: "110"))?.suffix == " to 110")
+        #expect(TargetLineModel.from(status(targetShort: "167,70"))?.suffix == " to 167,70")
+    }
+
+    @Test("no short price — hit-only, unpriced, or an older payload — means no suffix")
+    func noSuffixWithoutTargetShort() {
+        #expect(TargetLineModel.from(status(targetShort: nil))?.suffix == nil)
+        let hit = TargetLineModel.from(
+            status(text: "Hit", sentence: "Your 190,00 USD line has been hit",
+                   side: nil, near: false, hitOnly: true, targetShort: nil)
+        )
+        #expect(hit?.suffix == nil)
     }
 }

@@ -14,6 +14,8 @@ import SwiftUI
 /// than pretending it moved zero, and says so. Dropping that here would turn a
 /// carefully qualified number into a confident wrong one.
 struct SummaryHeader: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @State private var showsTrend = false
     let summary: LiveSummary
     /// "Total value" for the holdings book; the options box says what it is.
     var title = "Total value"
@@ -21,17 +23,26 @@ struct SummaryHeader: View {
     var accessibilityName = "Portfolio summary"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.caption)
+                    .font(QuietDesign.TypeRole.supporting)
                     .foregroundStyle(Color(Tokens.textMuted))
                 total
             }
 
-            HStack(alignment: .top, spacing: 24) {
+            if dynamicTypeSize.isAccessibilitySize {
+              VStack(alignment: .leading, spacing: QuietDesign.Space.small) {
                 figure(label: "Today", value: summary.dayChange)
-                figure(label: "Total", value: summary.totalChange)
+                figure(label: "Total P/L", value: summary.totalChange)
+              }
+            } else {
+              HStack(alignment: .top, spacing: QuietDesign.Space.section) {
+                figure(label: "Today", value: summary.dayChange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                figure(label: "Total P/L", value: summary.totalChange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+              }
             }
 
             if !summary.excludedSymbols.isEmpty {
@@ -43,24 +54,27 @@ struct SummaryHeader: View {
                 note("Today's change — both the amount and the percentage — omits positions without day-change data.")
             }
 
-            // The whole book's five-session lights, along the bottom edge
-            // like every tile's — the summed value, not one price
-            // (2026-09-21). Reserved-but-blank when the server sent none.
-            // `.ignore`, not a bare label: the lights hide their own bars
-            // from VoiceOver, so the row must be its own element to be read.
-            TrendLights(days: summary.trend)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(Self.trendLabel(summary.trend))
+            Button {
+                showsTrend.toggle()
+            } label: {
+                HStack(spacing: QuietDesign.Space.small) {
+                    Text("Last 5 sessions")
+                    Image(systemName: showsTrend ? "chevron.up" : "chevron.down")
+                }
+                .font(QuietDesign.TypeRole.metadata)
+                .foregroundStyle(Color(Tokens.textMuted))
+            }
+            .buttonStyle(.plain)
+            .frame(minHeight: 44)
+            .accessibilityLabel(showsTrend ? "Hide last five sessions" : "Show last five sessions")
+            if showsTrend {
+                TrendLights(days: summary.trend)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(Self.trendLabel(summary.trend))
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(Color(Tokens.surface1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(Tokens.borderSubtle), lineWidth: 1)
-        )
+        .padding(.vertical, QuietDesign.Space.small)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibilityName)
     }
@@ -73,19 +87,7 @@ struct SummaryHeader: View {
     }
 
     private var total: some View {
-        // The server sends "23 708,11 PLN" as one string; splitting it lets the
-        // currency sit smaller without reformatting the number, which would
-        // mean parsing money on the client.
-        let split = splitMoney(summary.totalValue ?? "—")
-        return HStack(alignment: .firstTextBaseline, spacing: 5) {
-            Text(split.amount)
-                .font(.system(.title2, weight: .semibold))
-                .monospacedDigit()
-                .foregroundStyle(Color(Tokens.textPrimary))
-            Text(split.currency)
-                .font(.footnote)
-                .foregroundStyle(Color(Tokens.textMuted))
-        }
+        QuietFinancialValue(text: summary.totalValue ?? "—", prominent: true)
     }
 
     private func figure(label: String, value: LiveFigure?) -> some View {
@@ -95,16 +97,13 @@ struct SummaryHeader: View {
                 .foregroundStyle(Color(Tokens.textMuted))
             // A null figure is muted, not coloured: "—" has no direction, and
             // painting it neutral-green would imply one.
-            Text(value?.text ?? "—")
-                .font(.system(.subheadline, weight: .medium))
-                .monospacedDigit()
-                .foregroundStyle(Color(value.map(\.direction.token) ?? Tokens.textMuted))
+            QuietFinancialValue(text: value?.text ?? "—", direction: value?.direction)
         }
     }
 
     private func note(_ text: String) -> some View {
         Text(text)
-            .font(.caption2)
+            .font(QuietDesign.TypeRole.metadata)
             .fixedSize(horizontal: false, vertical: true)
             .foregroundStyle(Color(Tokens.textMuted))
     }

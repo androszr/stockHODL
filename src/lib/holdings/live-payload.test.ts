@@ -121,6 +121,62 @@ describe('composeLivePayload — baseline composition', () => {
     });
   });
 
+  it('composes summary.extended from live extended readings, formatted and signed', () => {
+    // 10 AAPL at a 110 close, +2 per share pre-market, USD at 4 PLN:
+    // move 10 × 2 × 4 = 80 PLN on a regular total of 4400 PLN.
+    const payload = composeLivePayload(
+      inputs({ market: { ...inputs().market, status: 'early_trading' } }),
+      new Map([
+        [
+          'AAPL',
+          quote({
+            extendedKind: 'early',
+            extendedChangeAmt: '2',
+            extendedChangePct: pctChange(dec('110'), dec('112'))!.toString(),
+            extendedLive: true,
+          }),
+        ],
+      ]),
+    );
+    const pct = pctChange(dec('4400'), dec('4480'));
+    expect(payload.summary.extended).toEqual({
+      kind: 'early',
+      move: { text: `+${fmtMoney(dec('80'), 'PLN')} (${fmtPct(pct)})`, direction: 'gain' },
+      movePct: fmtPct(pct),
+      valueAtExtended: fmtMoney(dec('4480'), 'PLN'),
+      pricedCount: 1,
+      holdingsCount: 1,
+      movers: [
+        {
+          symbol: 'AAPL',
+          pct: { text: fmtPct(pctChange(dec('110'), dec('112'))), direction: 'gain' },
+        },
+      ],
+    });
+    expect(payload.summary.extended?.move.text).toMatch(/^\+80,00\szł \(\+1,82%\)$/);
+    // The regular-session figures are untouched by it.
+    expect(payload.summary.totalValue).toBe(fmtMoney(dec('4400'), 'PLN'));
+  });
+
+  it('a closed-market reading (extendedLive false) composes summary.extended as null', () => {
+    const payload = composeLivePayload(
+      inputs({ market: { ...inputs().market, status: 'closed' } }),
+      new Map([
+        [
+          'AAPL',
+          quote({
+            extendedKind: 'late',
+            extendedChangeAmt: '-1',
+            extendedChangePct: '-0.9',
+            extendedEndedAtMs: 1_754_611_200_000,
+            extendedLive: false,
+          }),
+        ],
+      ]),
+    );
+    expect(payload.summary.extended).toBeNull();
+  });
+
   it('quoteFigures passes the liveness fact through unchanged — ended-unvouched stays ended', () => {
     // The case the liveness field exists for: ended session, unvouched
     // instant — both endedAtMs AND live must cross as-is, never conflated.
@@ -305,9 +361,14 @@ describe('applyPriceTick — the coherent triple survives a streamed tick', () =
     // …and the after-hours line tracks the tick, close → tick.
     expect(updated.extendedKind).toBe('late');
     expect(updated.extendedChangePct).toBe(pctChange(dec('110'), dec('112'))!.toString());
+    // The per-share amount rides beside the percent, close → tick, so the
+    // book-wide aggregate never loses a holding on the first streamed tick.
+    expect(updated.extendedChangeAmt).not.toBeNull();
+    expect(dec(updated.extendedChangeAmt!).eq(dec('2'))).toBe(true);
 
     const early = applyPriceTick(base, TICK, 'early_trading').get('AAPL')!;
     expect(early.extendedKind).toBe('early');
+    expect(dec(early.extendedChangeAmt!).eq(dec('2'))).toBe(true);
   });
 
   it('a live extended tick pins endedAtMs to null — never resurrecting a stale label', () => {

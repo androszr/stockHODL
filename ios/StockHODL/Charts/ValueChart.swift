@@ -75,6 +75,8 @@ struct ValueChart: View {
     /// True only on the instrument PRICE chart; a total-value or return line
     /// is a different kind of number and matches by day alone.
     var matchOnPrice: Bool = false
+    /// A compact overview can reserve less room; detail charts keep 220 pt.
+    var plotHeight: CGFloat = 220
 
     @State private var scrubbed: PlotPoint?
     @State private var calloutSize: CGSize = .zero
@@ -95,7 +97,6 @@ struct ValueChart: View {
     /// next gesture's different start point re-captures instead.
     @State private var gestureStart: CGPoint?
 
-    private static let height: CGFloat = 220
     /// The change row's height, reserved in EVERY state — see `changeRow`.
     private static let changeRowHeight: CGFloat = 18
     /// Travel under which a gesture was a tap, not a scrub.
@@ -221,7 +222,7 @@ struct ValueChart: View {
         if state == .loading {
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(Tokens.surface2))
-                .frame(height: ValueChart.height)
+                .frame(height: plotHeight)
         } else if state == .ready, plotted.count >= 2 {
             // The marks are a SIGHTED affordance: VoiceOver reads the
             // individual trades from the transaction list and the lot menus,
@@ -237,13 +238,13 @@ struct ValueChart: View {
             // names nothing and leaves the group unannounced) rather than by a
             // different view.
             chart(plotted, placement)
-                .frame(height: ValueChart.height)
+                .frame(height: plotHeight)
                 .accessibilityElement(children: .contain)
                 .accessibilityLabel(ValueChart.markerAccessibility(placement))
         } else {
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(Color(Tokens.borderSubtle), style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
-                .frame(height: ValueChart.height)
+                .frame(height: plotHeight)
                 .overlay(
                     Text(state == .error
                         ? "Couldn't load this range. Pick another one or try again."

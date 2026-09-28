@@ -46,8 +46,17 @@ export const cachedPriceSchema = z.object({
   asOfMs: epochMsSchema,
 });
 
+/**
+ * Which extended session a figure describes. Exported on its own so the
+ * codegen registers ONE `ExtendedSessionKind` Swift type, shared by
+ * `ExtendedFigure.kind` and `LiveExtendedSummary.kind` — the two must compare.
+ */
+export const extendedSessionKindSchema = z
+  .enum(['early', 'late'])
+  .meta({ title: 'ExtendedSessionKind' });
+
 export const extendedFigureSchema = liveFigureSchema.extend({
-  kind: z.enum(['early', 'late']).meta({ title: 'ExtendedSessionKind' }),
+  kind: extendedSessionKindSchema,
   live: z.boolean(),
   endedAtMs: epochMsSchema.nullable(),
 });
@@ -79,6 +88,34 @@ export const liveMarketSchema = z.object({
   serverNowMs: epochMsSchema,
 });
 
+/** One mover chip in the extended-hours box. Exported as its own schema so
+ *  the codegen names it `LiveExtendedMover` rather than inventing one. */
+export const liveExtendedMoverSchema = z.object({
+  symbol: z.string(),
+  pct: liveFigureSchema,
+});
+
+/**
+ * The whole book at extended-hours prices — composed by
+ * `computeExtendedSummary` via `composeSlice`, ready-made text only. Present
+ * only while a pre-market or after-hours session is live and something
+ * traded in it (plans/2026-09-28-watchlist-grid-extended-hours.md).
+ */
+export const liveExtendedSummarySchema = z.object({
+  kind: extendedSessionKindSchema,
+  /** "+184,62 zł (+0,26%)". */
+  move: liveFigureSchema,
+  /** The percent half alone, for a widget. Null on a zero base. */
+  movePct: displayStringSchema.nullable(),
+  /** The book's value at extended prices. */
+  valueAtExtended: displayStringSchema,
+  /** Holdings with a live extended trade — a COUNT, not money. */
+  pricedCount: z.number().int().nonnegative(),
+  /** Holdings with shares — a COUNT, not money. */
+  holdingsCount: z.number().int().nonnegative(),
+  movers: z.array(liveExtendedMoverSchema).max(3),
+});
+
 export const liveSummarySchema = z.object({
   totalValue: displayStringSchema.nullable(),
   dayChange: liveFigureSchema.nullable(),
@@ -96,6 +133,13 @@ export const liveSummarySchema = z.object({
    * the same upgrade-path reason `trendDaysField` documents.
    */
   trend: trendDaysField,
+  /**
+   * The book's extended-hours move; null (or absent) outside a live extended
+   * session. Optional AND nullable for the `trendDaysField` reason: the
+   * previous build's persisted snapshot and widget cache carry no such key,
+   * and the options summary never sets it.
+   */
+  extended: liveExtendedSummarySchema.nullable().optional(),
 });
 
 export const liveScopeSchema = z.object({

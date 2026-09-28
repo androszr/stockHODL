@@ -84,7 +84,7 @@ Run all of these every time; report each as a criterion.
 | No ATS exception in a shipping plist | `grep -l 'NSAppTransportSecurity' ios/Config/Info.plist ios/Config/Info-*.plist \| grep -v -- '-Debug'` | no output |
 | Entitlements in step | `python3 scripts/check-entitlements.py` | exit 0 |
 | Privacy strings declared | `python3 scripts/check-privacy-strings.py` | exit 0 |
-| Keychain group not inlined | `grep -c '\$(KEYCHAIN_ACCESS_GROUP)' ios/Config/*.entitlements ios/Config/Info*.plist \| grep -v ':1$'` | no output (every file references it exactly once) |
+| Keychain group not inlined | `python3 scripts/check-keychain-group.py` | exit 0, no output (no file references it, or every file exactly once) |
 | Background tasks registered | for each `BGTaskScheduler.register(forTaskWithIdentifier: "<id>"` in `ios/`, `grep -c '<id>' ios/Config/Info.plist` | ≥1 per identifier |
 
 Notes on those checks: the `Double(` grep exempts exactly one file by name —

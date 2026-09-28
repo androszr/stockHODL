@@ -13,10 +13,14 @@ import WidgetKit
 struct SummaryWidgetView: View {
     let entry: SummaryEntry
     let side: SummarySide
+    /// Explicit family for fixed-size synthetic renders outside WidgetKit.
+    var previewFamily: WidgetFamily? = nil
     @Environment(\.widgetFamily) private var family
 
+    private var displayFamily: WidgetFamily { previewFamily ?? family }
+
     var body: some View {
-        if family == .accessoryRectangular {
+        if displayFamily == .accessoryRectangular {
             // Accessory families paint no background of their own, and a
             // widget that declares one anyway is refused a Lock Screen /
             // StandBy placement — same rule `LockScreenWidgetView` follows.
@@ -53,15 +57,20 @@ struct SummaryWidgetView: View {
         switch entry.outcome {
         case let .figures(payload, _):
             let summary = side.summary(of: payload)
+            // The Holdings side follows the extended session (percent and
+            // caption); Options keeps its regular day figure.
+            let extendedBadge = side == .holdings ? WidgetSessionPresentation.badge(summary) : nil
             VStack(alignment: .leading, spacing: 0) {
                 Text(side.title)
                     .font(.caption2)
-                Text(summary.dayChangePct ?? "—")
+                Text(side == .holdings
+                     ? WidgetSessionPresentation.holdingsPercent(summary)
+                     : summary.dayChangePct ?? "—")
                     .font(.title2.weight(.semibold))
                     .minimumScaleFactor(0.8)
                     .lineLimit(1)
                     .widgetAccentable()
-                Text("Today")
+                Text(extendedBadge ?? "Today")
                     .font(.caption2)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -79,66 +88,92 @@ struct SummaryWidgetView: View {
         // old is what's on screen" rather than leaving the fresh case mute.
         let asOf = capturedAt ?? entry.date
 
-        return VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 4) {
-                Image("WidgetMark")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: 12, height: 12)
-                Text("StockHODL")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Color(Tokens.textMuted))
-                Spacer(minLength: 2)
-                // A live `Text(_:style:)` rather than a formatted string: this
-                // one ticks on its own between reloads — the same trick the
-                // Yahoo widget uses for its "as of" line — instead of freezing
-                // at whatever age it had when the timeline last ran.
-                Text(asOf, style: .relative)
-                    .font(.caption2)
-                    .foregroundStyle(Color(Tokens.textMuted))
-                    .minimumScaleFactor(0.7)
-                    .lineLimit(1)
-            }
+        // Holdings follows the extended session (value at extended prices,
+        // the extended move as a row, a session badge); Options never does.
+        let holdings = side == .holdings
+        let badge = holdings ? WidgetSessionPresentation.badge(summary) : nil
+        let value = holdings
+            ? WidgetSessionPresentation.holdingsValue(summary)
+            : summary.totalValue ?? "—"
+        let rows: [WidgetFigureRow] = holdings
+            ? WidgetSessionPresentation.singleHoldingsRows(summary, family: displayFamily)
+            : [
+                WidgetFigureRow(label: "Today",
+                                text: WidgetSummaryDisplay.change(summary, total: false, family: displayFamily),
+                                direction: summary.dayChange?.direction),
+                WidgetFigureRow(label: "Total P/L",
+                                text: WidgetSummaryDisplay.change(summary, total: true, family: displayFamily),
+                                direction: summary.totalChange?.direction),
+            ]
+
+        return VStack(alignment: .leading, spacing: 2) {
+            header(asOf: asOf)
 
             Text(side.title)
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(Color(Tokens.textMuted))
-                .padding(.top, 4)
+                .padding(.top, displayFamily == .systemSmall ? 0 : 2)
 
-            Text(summary.totalValue ?? "—")
-                .font(.system(.title2, design: .rounded).weight(.semibold))
-                .foregroundStyle(Color(Tokens.textPrimary))
-                .minimumScaleFactor(0.6)
-                .lineLimit(1)
-                .padding(.top, 2)
+            if let badge {
+                Text(badge)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(Color(Tokens.textSecondary))
+            }
 
-            Spacer(minLength: 4)
+            WidgetFigureText(text: value, size: .single)
+                .layoutPriority(1)
 
-            // Today first, total second — the order the app's summary uses,
-            // and the order of how often either is looked at.
-            row(label: "Today", figure: summary.dayChange, percent: summary.dayChangePct)
-            row(label: "Total", figure: summary.totalChange, percent: summary.totalChangePct)
+            ForEach(rows, id: \.label) { item in
+                row(label: item.label, value: item.text, direction: item.direction)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
 
-    /// One change line. `systemSmall` has room for a percentage and nothing
-    /// else, so it shows the percentage; `systemMedium` has room for the amount
-    /// the percentage describes, and showing a percent alone there would be
-    /// hiding information the payload already carries.
-    private func row(label: String, figure: LiveFigure?, percent: String?) -> some View {
-        let text = family == .systemSmall ? percent : figure?.text
-        return HStack(spacing: 6) {
+    private func header(asOf: Date) -> some View {
+        let identity = HStack(spacing: 4) {
+            Image("WidgetMark")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 12, height: 12)
+            Text("StockHODL")
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color(Tokens.textMuted))
+        }
+        // Relative Text keeps counting without asking the provider to reload.
+        let freshness = (Text("Updated ") + Text(asOf, style: .relative))
+            .font(.caption2)
+            .foregroundStyle(Color(Tokens.textMuted))
+        return Group {
+            if displayFamily == .systemSmall {
+                VStack(alignment: .leading, spacing: 0) {
+                    identity
+                    freshness
+                }
+            } else {
+                HStack(spacing: 4) {
+                    identity
+                    Spacer(minLength: 2)
+                    freshness
+                }
+            }
+        }
+    }
+
+    private func row(label: String, value: String, direction: Direction?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 4) {
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(Color(Tokens.textMuted))
             Spacer(minLength: 2)
-            Text(text ?? "—")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color((figure?.direction ?? .neutral).token))
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
+            Text(value)
+                .font(displayFamily == .systemSmall ? .caption2.weight(.medium) : .caption.weight(.medium))
+                .monospacedDigit()
+                .foregroundStyle(Color((direction ?? .neutral).token))
+                .fixedSize(horizontal: false, vertical: true)
+                .multilineTextAlignment(.trailing)
         }
+        .accessibilityElement(children: .combine)
     }
 
     private func message(_ text: String) -> some View {

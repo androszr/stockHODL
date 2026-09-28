@@ -21,6 +21,7 @@ preflight, the verifier and the reviewers enforce).
 | `ios_test_gate` | `xcodebuild test -project ios/StockHODL.xcodeproj -scheme StockHODL -destination 'platform=iOS Simulator,name=iPhone 16' -quiet` |
 | `entitlements_gate` | `python3 scripts/check-entitlements.py` |
 | `privacy_gate` | `python3 scripts/check-privacy-strings.py` |
+| `guards_test_gate` | `python3 -m unittest discover -s scripts/tests -p 'test_*.py'` |
 | Plans | `plans/<YYYY-MM-DD>-<slug>.md` |
 | Reference docs | <the docs a planner should read after this one> |
 
@@ -66,10 +67,12 @@ coding.
    error. *(preflight BLOCK, guard script, CI)*
 3. **No ATS exception in a shipping plist.** Cleartext localhost lives in the
    `-Debug` twin only. *(preflight BLOCK, CI)*
-4. **Debug and Release entitlements match** except for `aps-environment`
-   (`development` / `production`). A capability added to one and not the
-   other ships a Release build quietly missing it. *(preflight BLOCK, guard
-   script, CI)*
+4. **Debug and Release entitlements match.** The one key allowed to differ
+   is `aps-environment` (`development` / `production`), and it is optional:
+   an app with no push carries it in neither file, which is consistent. Once
+   either file claims it, both must, each with its own value. A capability
+   added to one and not the other ships a Release build quietly missing it.
+   *(preflight BLOCK, guard script, CI)*
 5. **Persisted shapes decode tolerantly.** A new key on anything stored in
    UserDefaults, the keychain, a file or a shared container has a default on
    read; synthesized `Decodable` throws on a missing key even with a default.
@@ -88,7 +91,8 @@ The suite is hermetic. Green proves nothing about these surfaces, which is why
 the domain reviewers and the audit skill exist:
 
 - **The distribution build.** Simulator tests run a Debug build with the
-  development APNs entitlement and the Debug plist. Only the exported `.ipa`
+  Debug entitlements (and the development APNs entitlement, when the app
+  declares push) and the Debug plist. Only the exported `.ipa`
   says which entitlements shipped — the TestFlight workflow reads them back
   from the archive for exactly this reason.
 - **The device.** Push delivery, background refresh timing, the keyboard's
@@ -263,6 +267,22 @@ is what keeps it honest. An ended reading carries its liveness as its own fact
 renders the whole line muted with an sr-only "(closed session)" note;
 direction survives in the `fmtPct` sign.
 
+**The book-wide extended figure** (2026-09-28,
+plans/2026-09-28-watchlist-grid-extended-hours.md). `HoldingQuote` carries
+`extendedChangeAmt` (per share, beside the percent — set by
+`fetchQuotesBestEffort` and by `applyPriceTick`, so a streamed tick never
+drops a holding out of the sum). `computeExtendedSummary`
+(`src/lib/holdings/extended-summary.ts`, pure, Decimal) sums quantity ×
+amount × rate over holdings whose reading is LIVE (`extendedLive`, never
+`extendedKind !== null` — a closed market's persisted reading must not
+aggregate); the value at extended prices is the regular total plus that
+move, so a holding with no extended trade counts at its last price and an
+FX-excluded row cannot re-enter. `composeSlice` formats it into
+`LiveSummary.extended` (optional + nullable on the contract; null outside a
+live extended session), which the Dashboard's "Pre-market · holdings" box
+and the widgets' "Pre"/"AH" labels read — the widget route projects the
+summary unchanged. The main summary never folds it into Today.
+
 Symbol search is Massive-first: `/api/mobile/v1/symbols/search` asks the provider, and
 consults the local `symbol_directory` table (daily Nasdaq Trader refresh) when
 Massive is degraded, returns nothing, or — for short queries — returned no
@@ -397,6 +417,7 @@ protection, not a broken deploy.
 ### Design system
 
 There is no web product UI. The iPhone app is the only human surface.
+The reusable iOS visual roles, components, accessibility rules, and Xcode preview catalog are documented in [design-system.md](design-system.md).
 
 **No hardcoded colors.** `src/styles/tokens.css` is the only file allowed to
 contain a color literal. `pnpm tokens:gen` writes
@@ -832,10 +853,33 @@ change must work on every iPhone size the app already supports.
   `gen-swift-contracts.mjs` trigger are still hand additions the resync
   drops, so check `git diff .github` after one.
 
-  The build number is `github.run_number`, which is monotonic and traces a
-  TestFlight build back to a CI run and a commit. Recreating the workflow
-  would restart it and collide — `manageAppVersionAndBuildNumber` is false in
+  The build number is `IOS_BUILD_NUMBER_OFFSET` + `github.run_number`
+  (decision of 2026-09-23, plans/2026-09-23-fix-public-release-audit.md).
+  The run number alone is monotonic and traces a build to a run and a
+  commit, but it restarts at 1 in a new repository or a recreated workflow,
+  below builds App Store Connect already holds (29 for version 0.1 when the
+  public copy was prepared). The offset is a repository VARIABLE, set once
+  per repository to the highest build already consumed and never changed
+  while that repository uploads — `0` in the repository that has uploaded
+  all along (its counter already continues past its builds; it must be SET
+  there before this change is pushed, or its next `ios/**` push fails at
+  "Choose the build number"), the highest consumed build in a new
+  repository whose counter restarts; `scripts/ios-build-number.py` computes the
+  number before any key is touched and refuses an unset or malformed offset
+  (never read as zero), a re-run (`run_attempt` > 1 reuses a number an
+  earlier attempt may have uploaded — retry with a fresh dispatch) and
+  anything above 9999. `scripts/check-ios-bundle-versions.py` reads the
+  number back from the app AND the widget in the exported `.ipa` before
+  upload. Only one repository may upload at a time; the migration steps are
+  in `docs/publishing.md`. `manageAppVersionAndBuildNumber` stays false in
   `ExportOptions.plist` precisely so the number is ours to reason about.
+  **Resync hazard:** this numbering lives only in the local
+  `testflight.yml` and the local `release-ios` skill. The Dark Army
+  `ios-swift-testflight` pack template still says `github.run_number`, so a
+  pack resync reverts both to it — which would quietly restart numbering at
+  the new repository's run count and collide. After any resync, run
+  `git diff .github .claude/skills/release-ios` and restore the offset
+  wiring until the template carries it.
 
   **The APNs split this forced.** `aps-environment` was `development` in the
   one entitlements file, and a distribution build claiming that is rejected at
@@ -1211,13 +1255,23 @@ change must work on every iPhone size the app already supports.
   takes, where `watchlist-live.tsx` imports the Dashboard's `TickerTile`
   outright. iOS reuses its own `TickerTile` under the identical
   `.adaptive(minimum: 76)` template, passing `unrealizedPct: nil` so the P/L
-  line is absent rather than a `P/L —` about a position nobody holds. The
-  reason is drift, not density: the same tickers rendered as tiles on the
+  line is absent rather than a `P/L —` about a position nobody holds.
+  The reason is drift, not density: the same tickers rendered as tiles on the
   Dashboard and as rows here are two renderings of one idea, and the second
-  stops being maintained. A grid has no swipe actions, so removal is visible
-  as Edit mode (2026-08-30): the persistent top bar shows Edit whenever the
-  watchlist root has tiles (`TopBarEdit`, the `TopBarAdd` pattern), and while
-  it is on every tile carries a remove badge in place of its navigation. The
+  stops being maintained. (Quiet Precision, 2026-09-25, briefly turned it
+  into full-width `TickerTile` rows — exactly that drift;
+  plans/2026-09-28-watchlist-grid-extended-hours.md restored the grid with the
+  Dashboard's `TickerGridTile` under the shared `TileGrid.columns`, headings
+  kept, and the free P/L slot carrying a compact target line — "◎ ↓26,02% to
+  110", from `TargetStatus.text` plus the server's `targetShort`. The row
+  struct survives only in the design catalog.) The target sentence reads
+  "Needs to fall/rise X% to reach your … line" (2026-09-28): the figure is the
+  move the PRICE needs, measured from the price, and the old wording put it
+  beside "above"/"below" your line, a gap it never measured. A grid has no
+  swipe actions, so removal is visible as Edit mode (2026-08-30): the
+  persistent top bar shows Edit whenever the watchlist root has tiles
+  (`TopBarEdit`, the `TopBarAdd` pattern), and while it is on every tile
+  carries a remove badge in place of its navigation. The
   long press stays as a shortcut — it used to be the only, and invisible, way;
   the web removes from the ticker page instead, and a screen that could
   already do it here should not lose that by changing shape. The shared

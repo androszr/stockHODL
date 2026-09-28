@@ -69,3 +69,32 @@ ios/StockHODLShared/Generated/*.tmp/
 
 # Python bytecode (tools/demo_shots.py)
 __pycache__/
+
+# managed by Dark Army
+.env
+.env.*
+!.env.example
+*.p12
+*.key
+Thumbs.db
+.idea/
+*.swp
+*~
+.claude/settings.local.json
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+.build/
+DerivedData/
+*.ipa
+*.dSYM.zip
+/scout/
+/manual-check/
+user-data/
+
+# Design work captures stay local; never published
+docs/design/

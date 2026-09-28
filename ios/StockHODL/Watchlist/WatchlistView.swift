@@ -20,6 +20,8 @@ struct WatchlistView: View {
     /// `SymbolSearchSheet` show the same recent lookups.
     let recents: RecentSymbolsStore
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
         ZStack {
             Color(Tokens.surface0).ignoresSafeArea()
@@ -91,15 +93,9 @@ struct WatchlistView: View {
         }
     }
 
-    /// The Dashboard's tile GRID, not a list — the same shape the web
-    /// watchlist takes (`watchlist-live.tsx` renders `TickerTile` in the
-    /// Dashboard's auto-fill grid, deliberately reusing that component).
-    ///
-    /// A watched stock is a ticker and a price; a full-width row spent the
-    /// whole phone on two figures and showed four names per screen where the
-    /// grid shows twenty. The stronger reason is drift: the same tickers
-    /// appearing as tiles on the Dashboard and as rows here is two renderings
-    /// of one idea, and the second one is the one that stops being maintained.
+    /// The server's target-proximity sections keep their order, each drawn
+    /// as the Dashboard's tile grid (2026-09-28 — the 2026-09-25 rows were
+    /// two renderings of one idea, the drift the 2026-08-18 grid avoided).
     private var rows: some View {
         ScrollView {
             // News sits above the tiles, as the section does on the web's
@@ -121,7 +117,7 @@ struct WatchlistView: View {
                 ForEach(store.sections) { section in
                     if let title = section.title {
                         Text(title)
-                            .font(.footnote)
+                            .font(QuietDesign.TypeRole.section)
                             .foregroundStyle(Color(Tokens.textSecondary))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, 16)
@@ -136,12 +132,13 @@ struct WatchlistView: View {
         .refreshable { await store.refresh() }
     }
 
-    /// One section's tile grid. Edit-mode remove badges and the long-press
-    /// menu stay attached per tile inside each section, unchanged.
+    /// One section's tiles, under the Dashboard's column template. Edit-mode
+    /// remove badges and the long-press shortcut remain available on each
+    /// stock — a grid has no swipe actions, so those are the removal paths.
     private func grid(for section: WatchlistSection) -> some View {
         LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 76), spacing: 8)],
-            spacing: 8
+            columns: TileGrid.columns(isAccessibilitySize: dynamicTypeSize.isAccessibilitySize),
+            spacing: QuietDesign.Space.small
         ) {
                 ForEach(section.items, id: \.instrumentId) { item in
                     if isEditing {
@@ -192,7 +189,7 @@ struct WatchlistView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, QuietDesign.Space.page)
             .padding(.top, 8)
     }
 
@@ -200,7 +197,7 @@ struct WatchlistView: View {
     /// the argument list is long enough that a second copy would drift.
     private func tile(for item: WatchedItem) -> some View {
         let figures = store.figures(for: item)
-        return TickerTile(
+        return TickerGridTile(
             symbol: item.symbol,
             displayName: item.displayName,
             // No cached fallback exists on this payload —
@@ -218,8 +215,9 @@ struct WatchlistView: View {
             // The watchlist row carries its own strip — this
             // store never reads the bootstrap.
             trend: item.trend,
-            // The proximity marker rides the free P/L slot: how far the
-            // nearest line is, and which way the price would have to move.
+            // The compact target line rides the free P/L slot: how far the
+            // nearest line is, which way the price would have to move and,
+            // when it fits, "to 110".
             target: figures?.target
         )
     }

@@ -31,17 +31,37 @@ describe('targetStatusFor — the distance base and its formatting', () => {
 
   it('builds the sentence from the compact text, the side and fmtMoney (pl-PL, unsigned)', () => {
     const status = targetStatusFor([line()], '184', 'USD');
-    expect(status?.sentence).toBe(`3,26% below your ${fmtMoney(dec('190'), 'USD')} line`);
+    expect(status?.sentence).toBe(
+      `Needs to rise 3,26% to reach your ${fmtMoney(dec('190'), 'USD')} line`,
+    );
     // pl-PL: comma decimal separator, currency code trailing, no '+' sign.
     expect(status?.sentence).toContain('190,00');
     expect(status?.sentence).not.toContain('+');
   });
 
-  it('a price ABOVE the line reads "above" with the same unsigned distance', () => {
+  it('a price ABOVE the line needs to FALL, with the same unsigned distance', () => {
     const status = targetStatusFor([line({ targetPrice: '180' })], '184', 'USD');
     expect(status?.side).toBe('above');
     expect(status?.text).not.toContain('-');
-    expect(status?.sentence).toContain('above your');
+    expect(status?.sentence).toMatch(/^Needs to fall /);
+    expect(status?.sentence).toContain('to reach your');
+  });
+
+  it('the success criterion: 148,68 USD against a 110,00 USD line', () => {
+    const status = targetStatusFor([line({ targetPrice: '110' })], '148.68', 'USD');
+    expect(status?.sentence).toBe(
+      `Needs to fall 26,02% to reach your ${fmtMoney(dec('110'), 'USD')} line`,
+    );
+    expect(status?.sentence).toContain('110,00');
+    expect(status?.text).toBe('26,02%');
+  });
+
+  it('a price BELOW the line needs to RISE', () => {
+    const status = targetStatusFor([line({ targetPrice: '125' })], '123.47', 'USD');
+    expect(status?.side).toBe('below');
+    expect(status?.sentence).toBe(
+      `Needs to rise ${status?.text} to reach your ${fmtMoney(dec('125'), 'USD')} line`,
+    );
   });
 
   it('the 5% boundary is INCLUSIVE: exactly 5,00% is near, just outside is not', () => {
@@ -79,6 +99,28 @@ describe('targetStatusFor — the distance base and its formatting', () => {
     const status = targetStatusFor([hit, pending], '184', 'USD');
     expect(status?.sentence).toContain(fmtMoney(dec('200'), 'USD'));
     expect(status?.hitOnly).toBe(false);
+  });
+
+  it('targetShort: a whole target has no decimals, a fractional one has two', () => {
+    expect(targetStatusFor([line()], '184', 'USD')?.targetShort).toBe('190');
+    expect(targetStatusFor([line({ targetPrice: '167.7' })], '170', 'USD')?.targetShort).toBe(
+      '167,70',
+    );
+    // The at-the-line branch carries it too.
+    expect(targetStatusFor([line({ targetPrice: '184' })], '184', 'USD')?.targetShort).toBe('184');
+  });
+
+  it('targetShort is null for hit-only and unpriced statuses', () => {
+    expect(
+      targetStatusFor([line({ hitAtMs: 1_757_000_100_000 })], '184', 'USD')?.targetShort,
+    ).toBeNull();
+    expect(targetStatusFor([line()], null, 'USD')?.targetShort).toBeNull();
+    expect(targetStatusFor([line()], '0', 'USD')?.targetShort).toBeNull();
+  });
+
+  it('the hit sentence is unchanged', () => {
+    const status = targetStatusFor([line({ hitAtMs: 1_757_000_100_000 })], '184', 'USD');
+    expect(status?.sentence).toBe(`Your ${fmtMoney(dec('190'), 'USD')} line has been hit`);
   });
 
   it('only hit lines ⇒ hitOnly, group none, and the tile text "Hit"', () => {

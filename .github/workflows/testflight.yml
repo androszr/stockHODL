@@ -13,18 +13,22 @@ name: TestFlight
 #     it speaks, if the server has one — bake the production host into the
 #     Release xcconfig for the same reason.
 #   * The build number must strictly increase per (bundle id, marketing
-#     version). `github.run_number` does that and stays traceable to a run.
+#     version). It is IOS_BUILD_NUMBER_OFFSET (a repository variable) plus
+#     `github.run_number`: the run number alone restarts at 1 in a new
+#     repository, below builds App Store Connect already holds. The offset is
+#     set once per repository — docs/publishing.md says how — and a re-run is
+#     refused, because it reuses a number an earlier attempt may have uploaded.
 
 on:
   push:
     branches: [main]
     # Server-only commits do not change the binary, and a macOS runner is the
-    # most expensive minute in this repo. Contracts and tokens are included
-    # because the app compiles them in.
+    # most expensive minute in this repo.
     paths:
       - 'ios/**'
       - '.github/workflows/testflight.yml'
-      - 'scripts/gen-swift-contracts.mjs'
+      - 'scripts/ios-build-number.py'
+      - 'scripts/check-ios-bundle-versions.py'
   workflow_dispatch:
 
 # Never cancel an upload in flight: a half-sent binary still consumes its build
@@ -45,6 +49,27 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # One build number for the whole run, decided before any key or
+      # certificate is touched, and refused outright when it cannot be right:
+      # an unset offset (never read as zero) or a re-run (it reuses a number
+      # an earlier attempt may already have uploaded — start a fresh run).
+      - name: Choose the build number
+        env:
+          IOS_BUILD_NUMBER_OFFSET: ${{ vars.IOS_BUILD_NUMBER_OFFSET }}
+          RUN_NUMBER: ${{ github.run_number }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          if ! BUILD_NUMBER=$(python3 scripts/ios-build-number.py \
+                --offset "$IOS_BUILD_NUMBER_OFFSET" \
+                --run-number "$RUN_NUMBER" \
+                --run-attempt "$RUN_ATTEMPT"); then
+            echo "::error::No build number for this run — the line above says why."
+            exit 1
+          fi
+          echo "Build number $BUILD_NUMBER (offset $IOS_BUILD_NUMBER_OFFSET + run $RUN_NUMBER)"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
 
       # Fail on the toolchain rather than on forty confusing concurrency
       # errors five minutes later. An image can quietly change what its
@@ -122,12 +147,19 @@ jobs:
       # mint one if the keychain had none — it now has the imported one, so
       # nothing is created. (A CODE_SIGN_IDENTITY override to Distribution
       # is refused on an automatically signed target; tried 2026-09-21.)
+      # The team id lives in the gitignored Local.xcconfig on the owner's Mac,
+      # so the runner is handed it as a secret instead.
       - name: Archive
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
           set -euo pipefail
+          if [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::error::APPLE_TEAM_ID must be set — the 10-character team id from developer.apple.com > Account > Membership details."
+            exit 1
+          fi
           xcodebuild archive \
             -project ios/StockHODL.xcodeproj \
             -scheme StockHODL \
@@ -138,7 +170,8 @@ jobs:
             -authenticationKeyPath "$RUNNER_TEMP/asc/key.p8" \
             -authenticationKeyID "$ASC_KEY_ID" \
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }}
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
       # Re-signs for distribution and produces the .ipa. The archive above is
       # signed with the DEVELOPMENT identity — that is what automatic signing
@@ -170,6 +203,12 @@ jobs:
           rm -rf "$RUNNER_TEMP/verify"
           unzip -q "$IPA" -d "$RUNNER_TEMP/verify"
           APP=$(ls -d "$RUNNER_TEMP/verify/Payload"/*.app)
+          # An app with no push capability declares no APNs environment at
+          # all, and there is nothing to check.
+          if ! plutil -extract aps-environment raw -o - ios/Config/StockHODL-Release.entitlements >/dev/null 2>&1; then
+            echo "No push capability in the Release entitlements — skipping."
+            exit 0
+          fi
           ENV=$(codesign -d --entitlements :- "$APP" 2>/dev/null \
                 | plutil -extract aps-environment raw -o - - || echo MISSING)
           echo "aps-environment: $ENV"
@@ -177,6 +216,19 @@ jobs:
             echo "::error::The exported app claims aps-environment=$ENV. A distribution build must claim production — see ios/Config/StockHODL-Release.entitlements."
             exit 1
           fi
+
+      # The number the archive was told is not proof of the number it holds:
+      # read CFBundleVersion back from the app AND its widget in the .ipa, and
+      # refuse unless both are this run's build number and both carry the same
+      # marketing version.
+      - name: Refuse a build number the app and widget do not both carry
+        run: |
+          set -euo pipefail
+          IPA=$(ls "$RUNNER_TEMP/export"/*.ipa)
+          rm -rf "$RUNNER_TEMP/verify-versions"
+          unzip -q "$IPA" -d "$RUNNER_TEMP/verify-versions"
+          APP=$(ls -d "$RUNNER_TEMP/verify-versions/Payload"/*.app)
+          python3 scripts/check-ios-bundle-versions.py --app "$APP" --build-number "$BUILD_NUMBER"
 
       # The same archive through the same options, with `destination` flipped
       # on a copy — so what goes up is what was just checked, and the
@@ -211,6 +263,6 @@ jobs:
         run: |
           echo "### Uploaded to TestFlight" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Build \`${{ github.run_number }}\` from \`${{ github.sha }}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "Build \`$BUILD_NUMBER\` from \`${{ github.sha }}\` — run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}." >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "It reaches the phone once App Store Connect finishes processing — internal testing needs no review." >> "$GITHUB_STEP_SUMMARY"

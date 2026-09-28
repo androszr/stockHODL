@@ -20,43 +20,41 @@ struct OptionTile: View {
         TileFrame {
             TickerLogo(symbol: item.underlying, size: 32, monogramChars: 3)
 
-            // Identity line, `NET $370C`.
-            Text("\(item.underlying) $\(item.strikeLabel)\(typeSuffix)")
-                .font(.system(.caption, weight: .semibold))
+            // Identity on two lines, `NET` over `$370 C`: at the stock
+            // tile's title size the joined `NET $370C` does not fit a cell,
+            // and a truncated strike is the one thing a contract tile must
+            // never lose.
+            Text(item.underlying)
+                .font(QuietDesign.TypeRole.tileTitle)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .foregroundStyle(Color(Tokens.textPrimary))
+            Text("$\(item.strikeLabel) \(typeSuffix)")
+                .font(QuietDesign.TypeRole.tileFigure)
                 .monospacedDigit()
                 .lineLimit(1)
-                .truncationMode(.tail)
+                .minimumScaleFactor(0.8)
                 .foregroundStyle(Color(Tokens.textPrimary))
 
-            // Expiry, deliberately QUIET: it is the one thing distinguishing
-            // two otherwise identical-looking contracts, so it has to be
-            // present — but it is reference detail, not a figure to scan.
+            // Expiry, deliberately quiet: it tells two otherwise identical
+            // contracts apart, but it is reference detail, not a figure.
             Text(item.expiryLabel)
-                .font(.system(size: 10))
+                .font(.caption2)
                 .monospacedDigit()
                 .lineLimit(1)
-                .truncationMode(.tail)
+                .minimumScaleFactor(0.8)
                 .foregroundStyle(Color(Tokens.textMuted))
 
             TilePrice(price: item.price, estimate: item.priceIsEstimate)
 
-            HStack(spacing: 3) {
-                Text("P/L").foregroundStyle(Color(Tokens.textMuted))
-                Text(item.plPct)
-                    .monospacedDigit()
-                    .foregroundStyle(Color(item.plDirection.token))
-            }
-            .font(.system(size: 11))
-            .lineLimit(1)
+            TileFigureLine(label: "P/L", value: item.plPct, direction: item.plDirection)
 
             sessionLine
 
-            // Same strip, same position, same arithmetic as the stock tile —
-            // the two sit side by side in one grid and a difference here would
-            // read as a difference in the instrument. Only the GRADING BANDS
-            // differ, and they differ on the server
-            // (`src/lib/trend/trend-scale.ts`), where the reason for them can
-            // be stated once.
+            // Same strip, same position, same arithmetic as the stock tile;
+            // only the grading bands differ, on the server
+            // (`src/lib/trend/trend-scale.ts`).
+            Spacer(minLength: 0)
             TrendLights(days: item.trend)
         }
         .accessibilityElement(children: .combine)
@@ -70,11 +68,7 @@ struct OptionTile: View {
     @ViewBuilder
     private var sessionLine: some View {
         if let day = item.dayPct {
-            Text(day.text)
-                .font(.system(size: 11))
-                .monospacedDigit()
-                .lineLimit(1)
-                .foregroundStyle(Color(day.direction.token))
+            TileFigureLine(label: "Day", value: day.text, direction: day.direction)
         } else {
             // The nothing-known case renders a NON-BREAKING SPACE, not an
             // em-dash. The slot still has to hold its line so the tile does
@@ -86,8 +80,7 @@ struct OptionTile: View {
             // to compare. The two cases that DO carry information keep their
             // words.
             Text(mutedSessionText)
-                .font(.system(size: 11))
-                .monospacedDigit()
+                .font(.caption2)
                 .lineLimit(1)
                 .foregroundStyle(Color(Tokens.textMuted))
         }

@@ -89,6 +89,55 @@ struct ContractsTests {
 
         #expect(payload.holdings[0].extended?.kind == .late)
         #expect(payload.summary.dayChange?.direction == .gain)
+        // A payload from before the extended aggregate existed: no key, no
+        // failure — the previous build's persisted snapshot looks like this.
+        #expect(payload.summary.extended == nil)
+        #expect(payload.scopes[0].summary.extended == nil)
+    }
+
+    @Test("a live payload whose summary carries the extended aggregate decodes")
+    func livePayloadWithExtendedSummary() throws {
+        let payload = try decode(LivePayload.self, """
+        {
+          "market": {
+            "status": "late_trading",
+            "nextTransitionAtMs": null,
+            "nextTransitionKind": null,
+            "pollingResumesAtMs": null,
+            "serverNowMs": 1754790000000
+          },
+          "summary": {
+            "totalValue": "70 238,19 zł",
+            "dayChange": { "text": "+252,34 zł (+0,36%)", "direction": "gain" },
+            "totalChange": { "text": "+9 420,00 zł (+15,49%)", "direction": "gain" },
+            "dayChangePct": "+0,36%",
+            "totalChangePct": "+15,49%",
+            "excludedSymbols": [],
+            "partialDayChange": false,
+            "extended": {
+              "kind": "late",
+              "move": { "text": "−312,08 zł (−0,44%)", "direction": "loss" },
+              "movePct": "−0,44%",
+              "valueAtExtended": "69 926,11 zł",
+              "pricedCount": 8,
+              "holdingsCount": 8,
+              "movers": [
+                { "symbol": "AVGO", "pct": { "text": "−2,40%", "direction": "loss" } }
+              ]
+            }
+          },
+          "holdings": [],
+          "scopes": [],
+          "hasPollableSymbols": true
+        }
+        """)
+
+        let extended = try #require(payload.summary.extended)
+        #expect(extended.kind == .late)
+        #expect(extended.valueAtExtended == "69 926,11 zł")
+        #expect(extended.pricedCount == 8)
+        #expect(extended.movers.first?.symbol == "AVGO")
+        #expect(extended.movers.first?.pct.direction == .loss)
     }
 
     @Test("the degraded payload decodes — no quote, no FX rate")

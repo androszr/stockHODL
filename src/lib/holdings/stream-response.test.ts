@@ -20,7 +20,7 @@ vi.mock('@/lib/market-data/massive', () => ({
   massiveProvider: { streamPrices: h.streamPrices },
 }));
 
-import type { HoldingQuote } from '@/lib/holdings/live-payload';
+import { composeLivePayload, type HoldingQuote } from '@/lib/holdings/live-payload';
 import { quoteStreamResponse } from '@/lib/holdings/stream-response';
 
 function quotes(): ReadonlyMap<string, HoldingQuote> {
@@ -82,6 +82,78 @@ describe('quoteStreamResponse — idle short-circuit', () => {
       openOptions({ status: 'closed', hasPollableSymbols: true }),
     );
     expect(await response.text()).toContain('event: idle');
+    expect(h.streamPrices).not.toHaveBeenCalled();
+  });
+
+  it('sends a fresh payload BEFORE idle, so a closed market clears the after-hours summary', async () => {
+    // 20:00 New York: the after-hours reading persists with extendedLive
+    // false. A client still showing the last late_trading frame must receive
+    // this composition before its pump stops on `idle`.
+    const closedQuotes = new Map<string, HoldingQuote>([
+      [
+        'AAPL',
+        {
+          ...quotes().get('AAPL')!,
+          extendedKind: 'late',
+          extendedChangeAmt: '-1.20',
+          extendedChangePct: '-0.97',
+          extendedLive: false,
+          extendedEndedAtMs: 1_754_611_200_000,
+        },
+      ],
+    ]);
+    const response = quoteStreamResponse(
+      streamRequest(),
+      openOptions({
+        status: 'closed',
+        quotes: closedQuotes,
+        compose: (q) =>
+          composeLivePayload(
+            {
+              engineTxs: [
+                {
+                  id: 't1',
+                  instrumentId: 'i1',
+                  symbol: 'AAPL',
+                  displayName: 'Apple Inc.',
+                  currency: 'USD',
+                  side: 'buy',
+                  quantity: '10',
+                  price: '100',
+                  fees: '0',
+                  fxRateToBase: '4.00000000',
+                  tradeDate: '2026-01-05',
+                  createdAt: new Date('2026-01-05T12:00:00Z'),
+                },
+              ],
+              fxRates: new Map([['USD', '4.00']]),
+              market: {
+                status: 'closed',
+                nextTransitionAtMs: null,
+                nextTransitionKind: null,
+                pollingResumesAtMs: null,
+              },
+              hasPollableSymbols: true,
+            },
+            q,
+          ),
+      }),
+    );
+    const body = await response.text();
+
+    const payloadAt = body.indexOf('event: payload');
+    const idleAt = body.indexOf('event: idle');
+    expect(payloadAt).toBeGreaterThanOrEqual(0);
+    expect(idleAt).toBeGreaterThan(payloadAt);
+
+    const dataLine = body
+      .slice(payloadAt, idleAt)
+      .split('\n')
+      .find((line) => line.startsWith('data: '));
+    const payload = JSON.parse(dataLine!.slice('data: '.length));
+    expect(payload.summary.extended).toBeNull();
+    // The closed frame still carries the last session's reading on the tile.
+    expect(payload.holdings[0].extended).toMatchObject({ kind: 'late', live: false });
     expect(h.streamPrices).not.toHaveBeenCalled();
   });
 });

@@ -125,6 +125,24 @@ Two hold everywhere:
 2. **Persisted shapes are forward-compatible.** A new key gets a default on
    read, a removed key is tolerated on load, a migration is additive.
 
+## Where to search
+
+Never run a recursive file walk — `find`, `grep -r` or `-R`, `rg`, `fd`,
+`ls -R`, `du`, `tree`, `mdfind` without `-onlyin`, or anything like them —
+rooted at `/`, at your home folder, or at `Documents`, `Desktop`,
+`Downloads`, `Pictures`, `Music`, `Movies` or `Library` inside it. On a Mac
+running Dark Army such a walk is charged to Dark Army and raises Photos,
+Music and Documents privacy prompts naming it. Search only inside this
+project, Dark Army's own folder `~/.dark-army`, your session's own scratch
+folder, and the folders Dark Army knows (its checkout and every project
+onboarded to it, either direction): they are listed in
+`~/.dark-army/search-scope.json` — read that one file (it holds folder
+paths and nothing else); never search for it. Reading a file at a known
+exact path is always fine. A plan or card file is never something to search
+for: a session started from a Dark Army card was handed its plan path, a
+card's `plan_path` is on the board (the `dark_army_*` board tools or Dark
+Army's panel), and otherwise ask the person for the path.
+
 ## Finishing a piece of work
 
 When the task is complete and you are not waiting on anything, the final

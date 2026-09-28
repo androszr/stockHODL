@@ -8,7 +8,7 @@ import {
 } from '@/lib/holdings/live-payload';
 import { dec, pctChange } from '@/lib/money';
 
-import { livePayloadSchema } from './live-payload';
+import { liveExtendedSummarySchema, livePayloadSchema } from './live-payload';
 
 /**
  * THE anti-drift test.
@@ -140,6 +140,93 @@ describe('livePayloadSchema mirrors the real composer', () => {
     expect(payload.holdings[0].extended?.kind).toBe('late');
   });
 
+  it('carries the extended-hours aggregate for two live pre-market quotes', () => {
+    const payload = composeLivePayload(
+      inputs({
+        engineTxs: [
+          buy(),
+          buy({
+            id: 't2',
+            instrumentId: '33333333-3333-4333-8333-333333333333',
+            symbol: 'MSFT',
+            displayName: 'Microsoft',
+            quantity: '5',
+            price: '400',
+          }),
+        ],
+        market: { ...inputs().market, status: 'early_trading' },
+      }),
+      new Map([
+        [
+          'AAPL',
+          quote({
+            extendedKind: 'early',
+            extendedChangeAmt: '2',
+            extendedChangePct: '1.8181818',
+            extendedLive: true,
+          }),
+        ],
+        [
+          'MSFT',
+          quote({
+            price: '420',
+            prevClose: '415',
+            dayChangeAmt: '5',
+            dayChangePct: '1.2048',
+            extendedKind: 'early',
+            extendedChangeAmt: '-3',
+            extendedChangePct: '-0.7142857',
+            extendedLive: true,
+          }),
+        ],
+      ]),
+    );
+
+    const parsed = livePayloadSchema.safeParse(payload);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
+    const extended = payload.summary.extended;
+    expect(extended).not.toBeNull();
+    expect(extended?.pricedCount).toBe(2);
+    expect(extended?.holdingsCount).toBe(2);
+    expect(extended?.kind).toBe('early');
+    // MSFT: 5 × −3 × 4 = −60; AAPL: 10 × 2 × 4 = +80 → larger |impact| first.
+    expect(extended?.movers.map((m) => m.symbol)).toEqual(['AAPL', 'MSFT']);
+    assertNoUnknownKeys(
+      extended,
+      new Set([
+        'kind',
+        'move',
+        'movePct',
+        'valueAtExtended',
+        'pricedCount',
+        'holdingsCount',
+        'movers',
+      ]),
+      'summary.extended',
+    );
+    assertNoUnknownKeys(extended?.movers[0], new Set(['symbol', 'pct']), 'movers[0]');
+    expect(liveExtendedSummarySchema.strict().safeParse(extended).success).toBe(true);
+  });
+
+  it('refuses a fractional count or more than three movers', () => {
+    const base = {
+      kind: 'late',
+      move: { text: '+1,00 zł', direction: 'gain' },
+      movePct: null,
+      valueAtExtended: '100,00 zł',
+      pricedCount: 1,
+      holdingsCount: 1,
+      movers: [],
+    };
+    expect(liveExtendedSummarySchema.safeParse(base).success).toBe(true);
+    expect(liveExtendedSummarySchema.safeParse({ ...base, pricedCount: 1.5 }).success).toBe(false);
+    const mover = { symbol: 'A', pct: { text: '+1,00%', direction: 'gain' } };
+    expect(
+      liveExtendedSummarySchema.safeParse({ ...base, movers: [mover, mover, mover, mover] })
+        .success,
+    ).toBe(false);
+  });
+
   it('carries no field the contract does not name', () => {
     const payload = composeLivePayload(
       inputs({
@@ -176,6 +263,7 @@ describe('livePayloadSchema mirrors the real composer', () => {
         'excludedSymbols',
         'partialDayChange',
         'trend',
+        'extended',
       ]),
       'summary',
     );

@@ -48,7 +48,8 @@ Phase 1 spawns nothing. Paths are the ones in `docs/context.md`; the defaults
 below are the layout the guard scripts expect.
 
 ```bash
-# 1. Entitlements: Debug and Release identical except aps-environment.
+# 1. Entitlements: Debug and Release identical except aps-environment (optional:
+#    an app with no push carries it in neither file, and that is consistent).
 python3 scripts/check-entitlements.py
 
 # 2. Privacy strings: every reachable gate declared in both app plists, none in extensions.
@@ -66,8 +67,10 @@ grep -rn 'Double(' ios --include='*.swift' | grep -v '<chart geometry file>'
 # 5. Minute without both digits.
 grep -rn --include='*.swift' -e '\.minute()' ios
 
-# 6. Keychain / app group referenced by build setting exactly once per file.
-grep -c '\$(KEYCHAIN_ACCESS_GROUP)' ios/Config/*.entitlements ios/Config/Info*.plist | grep -v ':1$'
+# 6. Keychain group referenced by build setting: no file references the group is
+#    consistent; once one does, every file references it exactly once. Exit 0 and
+#    no output is a pass; each ::error:: line names a file that is out of step.
+python3 scripts/check-keychain-group.py
 
 # 7. Background task identifiers registered.
 grep -rhoE 'forTaskWithIdentifier: *"[^"]+"' ios --include='*.swift' | grep -oE '"[^"]+"' | tr -d '"' | sort -u | while read -r id; do

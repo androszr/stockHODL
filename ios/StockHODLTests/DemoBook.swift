@@ -134,6 +134,7 @@ enum DemoBook {
             dayChange: figure(day, dayDirection),
             dayChangePct: dayPct,
             excludedSymbols: [],
+            extended: nil,
             partialDayChange: false,
             totalChange: figure(total, totalDirection),
             totalChangePct: totalPct,
@@ -248,8 +249,30 @@ enum DemoBook {
                 StaticScope(id: Book.income.rawValue, name: Book.income.name, staticHoldings: [], txCount: 4),
             ],
             staticHoldings: holdings.map(staticHolding),
-            watchlist: []
+            watchlist: watchedItems
         )
+    }
+
+    static let watchedItems: [WatchedItem] = [
+        WatchedItem(currency: .usd, displayName: "Example Devices Incorporated", instrumentId: "demo-watch-1", symbol: "EXM", trend: week),
+        WatchedItem(currency: .usd, displayName: "Northern Energy and Materials", instrumentId: "demo-watch-2", symbol: "NEM", trend: week),
+    ]
+
+    static var watchlistPayload: WatchlistPayload {
+        WatchlistPayload(hasPollableSymbols: true, items: [
+            LiveWatchItem(
+                dayPct: figure("+1,24%", .gain), extended: nil,
+                instrumentId: "demo-watch-1", price: "123,45 USD",
+                target: TargetStatus(hitOnly: false, near: true,
+                    sentence: "Needs to rise 1,24% to reach your 125,00 USD line",
+                    side: .below, targetShort: "125", text: "1,24%"), targetGroup: .near
+            ),
+            LiveWatchItem(
+                dayPct: figure("−0,85%", .loss), extended: nil,
+                instrumentId: "demo-watch-2", price: "87,60 USD",
+                target: nil, targetGroup: .none
+            ),
+        ], market: market())
     }
 
     // MARK: - Options

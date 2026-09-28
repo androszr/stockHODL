@@ -131,7 +131,8 @@ nothing and starts no implementation.
    dark_army_add_card({
      title: "<the change, one line, imperative — 'Add X', not 'Plan for X'>",
      summary: "<what this is for, 1-3 sentences a non-developer could read>",
-     notes: "Plan: <abs plan path>\n\nRead that plan first, then run: /ship implement <abs plan path>\nThe plan carries its own acceptance criteria — implement it, do not re-plan it.\n\n<the plan's `## What this does`, verbatim>",
+     plan: "<abs plan path>",
+     notes: "<the plan's `## What this does`, verbatim>",
      tool: "<claude | codex | grok — the assistant running this>",
      stages: ["<each specialist from the plan's Stages header, in order>"]
    })
@@ -151,18 +152,23 @@ nothing and starts no implementation.
    Leave `project` out. The daemon attributes a card to the calling session's own
    project, and naming it by hand is how a card lands on somebody else's board.
 
-   Lead `notes` with the `Plan:` line and keep it short: the board shows the
-   first 400 characters, and the path plus the `/ship implement` line is what
-   the dispatch needs.
+   **`plan` is what carries the plan, never `notes`.** With it the card lands
+   in **Backlog** with the plan attached, in this one call, and Start opens
+   `/ship implement` from it. A plan path written only into `notes` leaves the
+   card in Prep, where Start opens a *planning* run that no tool can ever
+   finish — the card sticks there however much work the run does.
 
    **Do not ask for a column, and do not reach past this tool to get one.** A
    card an agent can arm is a loop with no human in it. Arriving in In progress
    is what a dispatch *means*, and pressing Start is the human's half of this
    skill.
 
-   The card lands in **Prep**. This plan *is* written, so call `dark_army_attach_plan`
-   once more, with the same path: it resolves the card you just authored and
-   moves it to Backlog with the plan attached.
+   The reply says **Backlog** with the plan attached: do not call
+   `dark_army_attach_plan` for it. Only when the tool refuses the `plan`
+   argument (a session born before Dark Army learned it) file the card without
+   `plan`, then call `dark_army_attach_plan` once with the same path — and file
+   this session's other cards (follow-ups, notes) only *after* that attach,
+   because a second unplanned Prep card makes the attach fail closed.
 
    **`dark_army_add_card` present and `dark_army_attach_plan` absent is its own case.** A
    channel process keeps the tool list it was born with, so the card is filed
@@ -180,6 +186,12 @@ nothing and starts no implementation.
    carries the same verbs as `mcp__bob__bob_*`; a session keeps the tool list
    it was born with. The plan file is still written, and naming its path is
    then the whole handoff.
+
+**The plan's follow-ups are filed here and only here.** After the plan's own
+card, each `## Out of scope` bullet beginning `Follow-up card:` becomes one
+Prep card (`notes` beginning `Follow-up from: <plan slug> — <abs plan path>,
+Out of scope`, `stages: ["sf-planner"]`); with no add verb, list them in the
+summary. The implement run never files them, so there is one card each.
 
 Then tell the user, and keep it to four things:
 
@@ -214,3 +226,35 @@ verbatim, as the last line of your final message (that line is what files
 the tab under Idle rather than *Needs you*). Never retry a refusal and
 never `/clear`. Without Dark Army on the machine it prints a
 left-open line, and that is the end of plan mode.
+
+## Batch: several cards in one session
+
+Entered when the prompt's first line begins `/ship batch:` — Dark Army's
+Refine on several ticked Prep cards. The prompt lists `## Card k of n —
+<title>` blocks, each with a `Card id:` line, the card's summary,
+instructions and `Objective:` lines. Every card is its own refinement, but
+the person is asked **once, at the start**, and the plans are written
+**in parallel**:
+
+1. Phase 1 for **every** card before any planner runs: assess each card
+   (at most 3 questions per card), then ask them all together — one
+   question call carrying as many as it takes (Claude: up to 4 per
+   `AskUserQuestion`, calls back to back), every question's text
+   prefixed `Card k of n — <title>: `. A card needing none records its
+   assumptions. Never ask again once planning starts.
+2. Phase 2 for every card: its plan path from its title, distinct across
+   the batch (suffix on a clash within it, as on disk).
+3. Phase 3 for every card **at once**: one `bc-planner` spawn per card in
+   the same message (parallel), each with its own answers, its own
+   `plan_path` and one extra packet line, `card_id: <that Card id>`; the
+   planner writes it into the plan's `- **Card:**` header.
+4. As each planner returns: Phase 4 on its plan, then Phase 5, attach
+   **immediately** — `dark_army_attach_plan({ path })`, no card argument,
+   the header names the card — so an early exit leaves every finished
+   card attached. A BLOCK holds only that card: attach the rest, then end
+   the turn with one `<!-- bob-tldr -->` naming every blocked card; on the
+   answer, resume Phase 4 for those cards alone.
+
+Never file a new card for a batch member; a refused attach is reported in
+the summary and that card stays in Prep. The summary names every card and
+the column it actually landed in. Phase 5b runs once, after the last card.

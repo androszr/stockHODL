@@ -181,6 +181,7 @@ export async function fetchQuotesBestEffort(
           dayLow: outcome.quote.dayLow,
           dayVolume: outcome.quote.dayVolume,
           vwap: outcome.quote.vwap,
+          extendedChangeAmt: outcome.quote.extendedChangeAmt,
           extendedChangePct: outcome.quote.extendedChangePct,
           extendedKind: outcome.quote.extendedKind,
           extendedEndedAtMs: outcome.quote.extendedEndedAtMs,

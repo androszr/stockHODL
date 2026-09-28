@@ -159,23 +159,17 @@ struct InstrumentView: View {
 
                 header
 
-                DayStatsPanel(stats: store.detail?.dayStats)
-
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .center, spacing: 8) {
-                        RangeTabs(selected: store.range) { store.range = $0 }
-                            .padding(.leading, -16)
+                    QuietSectionHeading(title: "Price history")
+                    RangeTabs(selected: store.range) { store.range = $0 }
+                        .padding(.leading, -16)
 
-                        // Line or candles. Display-only where the data allows:
-                        // `o`/`h`/`l` ride the same payload, and a range whose
-                        // bars carry none falls back to the line inside
-                        // `ValueChart` rather than drawing an empty frame.
-                        ChartToggle(
-                            selected: store.style,
-                            accessibilityName: "Chart style"
-                        ) { store.style = $0 }
-                        .fixedSize()
-                    }
+                    // Line or candles read the same payload; ValueChart falls
+                    // back to a line when a range has no OHLC bars.
+                    ChartToggle(
+                        selected: store.style,
+                        accessibilityName: "Chart style"
+                    ) { store.style = $0 }
 
                     ValueChart(
                         points: store.points,
@@ -225,6 +219,8 @@ struct InstrumentView: View {
                     // portfolio's breakdown is the position again, restated.
                     GroupBreakdown(groups: store.groups)
                 }
+
+                DayStatsPanel(stats: store.detail?.dayStats)
 
                 AboutPanel(about: store.detail?.about, currency: store.currency)
 
@@ -287,18 +283,17 @@ struct InstrumentView: View {
                         }
                     }
 
-                    Spacer(minLength: 8)
-
-                    InstrumentActionButtons(
-                        model: .current(
-                            isWatched: store.isWatched,
-                            isToggling: store.isTogglingWatch
-                        ),
-                        showsAddTransaction: makeTransactionForm != nil,
-                        onToggleWatch: { Task { await store.toggleWatch() } },
-                        onAddTransaction: { isAddingTransaction = true }
-                    )
                 }
+
+                InstrumentActionButtons(
+                    model: .current(
+                        isWatched: store.isWatched,
+                        isToggling: store.isTogglingWatch
+                    ),
+                    showsAddTransaction: makeTransactionForm != nil,
+                    onToggleWatch: { Task { await store.toggleWatch() } },
+                    onAddTransaction: { isAddingTransaction = true }
+                )
 
                 if detail.price == nil, let cached = detail.cachedPrice {
                     // A FETCH time, worded as one. It is never presented as a

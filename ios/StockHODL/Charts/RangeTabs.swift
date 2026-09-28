@@ -38,6 +38,8 @@ struct RangeTabs<Range: ChartRangeOption>: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 2)
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Chart period")
     }
 }
 
@@ -60,10 +62,10 @@ private struct RangePill: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(.system(.caption, weight: .medium))
+                .font(.system(.footnote, weight: .medium))
                 .monospacedDigit()
                 .padding(.horizontal, 12)
-                .padding(.vertical, 6)
+                .frame(minWidth: 44, minHeight: 44)
                 .background(background)
                 .foregroundStyle(foreground)
                 .clipShape(Capsule())

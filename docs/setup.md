@@ -130,12 +130,14 @@ In GitHub → Settings → Secrets and variables → Actions:
 | Secret | `ASC_PRIVATE_KEY` | the `.p8` file of that key | `testflight.yml` |
 | Secret | `IOS_DIST_P12` | one `.p12` exported from Keychain Access holding BOTH your Apple Development and Apple Distribution certificates, base64-encoded | `testflight.yml` |
 | Secret | `IOS_DIST_P12_PASSWORD` | the password you gave that export | `testflight.yml` |
+| Variable | `IOS_BUILD_NUMBER_OFFSET` | not a secret; the build number is this plus the run number, and the workflow refuses to run without it. `0` for a brand-new app, and `0` for the repository that has been uploading all along (its run counter already continues past its builds). For a NEW repository taking over an existing app: the highest build number App Store Connect already holds for this app and version, set once before its first upload — [publishing.md](publishing.md) step 5 says how to read it | `testflight.yml` |
 
 Then create the **`production`** environment: Settings → Environments → New
 environment → `production`. The production deploy job runs in it.
 
 `ci.yml` runs on every push to `main` and every pull request and needs none of these.
-`deploy.yml` needs the first six; `testflight.yml` the five App Store ones;
+`deploy.yml` needs the first six; `testflight.yml` the five App Store ones
+and the `IOS_BUILD_NUMBER_OFFSET` variable (it refuses to run without it);
 `price-alerts.yml` only `CRON_SECRET`.
 
 ## 7. Enroll a passkey on your phone

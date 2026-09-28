@@ -12,6 +12,7 @@ import SwiftUI
 /// `StaleLabel` (which a test can read) rather than in a `View` body (which
 /// one cannot).
 struct StaleBar: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let freshness: Freshness
 
     var body: some View {
@@ -26,7 +27,7 @@ struct StaleBar: View {
             // start of a second palette — and the obvious stand-in, `loss`, is
             // a category error: red on a portfolio screen means the money went
             // down, not that the clock did.
-            .font(.caption)
+            .font(QuietDesign.TypeRole.metadata)
             .fontWeight(label.isWarning ? .semibold : .regular)
             .foregroundStyle(Color(label.isWarning ? Tokens.textSecondary : Tokens.textMuted))
             .frame(maxWidth: .infinity)
@@ -36,7 +37,7 @@ struct StaleBar: View {
             // mid-scroll in. Without this it inserts itself instantly and the
             // rows jump; the animation makes it read as a thing arriving
             // rather than as a layout glitch.
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .transition(reduceMotion ? .identity : .move(edge: .top).combined(with: .opacity))
         }
     }
 
@@ -71,7 +72,7 @@ struct StaleCaption: View {
                 // 10 pt, deliberately smaller than `.caption`: this is a
                 // footnote under a row, not an alarm across the screen.
                 // Escalates by WEIGHT, never by hue — see `StaleBar`.
-                .font(.system(size: 10))
+                .font(QuietDesign.TypeRole.metadata)
                 .fontWeight(label.isWarning ? .semibold : .regular)
                 .foregroundStyle(
                     Color(label.isWarning ? Tokens.textSecondary : Tokens.textMuted)
@@ -115,6 +116,7 @@ struct LoadFailureView: View {
 
             Button(isOffline ? "Try now" : "Try again", action: retry)
                 .foregroundStyle(Color(Tokens.accent))
+                .quietHitRegion()
         }
         .padding(24)
     }

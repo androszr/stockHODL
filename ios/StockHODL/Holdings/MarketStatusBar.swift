@@ -13,8 +13,29 @@ import SwiftUI
 /// needs that answer more than a browser does, not less.
 struct MarketStatusBar: View {
     let market: LiveMarket
+    var compact = false
 
     var body: some View {
+        Group {
+            if compact {
+                line
+                    .padding(.vertical, QuietDesign.Space.xSmall)
+            } else {
+                line
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(Color(Tokens.surface1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(Tokens.borderSubtle), lineWidth: 1)
+                    )
+                    .padding(.top, 16)
+            }
+        }
+    }
+
+    private var line: some View {
         HStack(spacing: 8) {
             // Decorative — the adjacent word is the signal. Colour alone
             // never carries a state in this app.
@@ -39,18 +60,7 @@ struct MarketStatusBar: View {
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(Tokens.surface1))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(Tokens.borderSubtle), lineWidth: 1)
-        )
-        // Outside the fill — the web bar's `mt-4`. Without it the box
-        // sits flush under the top bar on Dashboard and Options.
-        .padding(.top, 16)
     }
 
     /// The word always carries the state — the dot's colour is never alone.

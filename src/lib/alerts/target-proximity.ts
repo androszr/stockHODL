@@ -2,7 +2,7 @@ import type Decimal from 'decimal.js';
 
 import type { TargetStatusContract } from '@/lib/api/contracts/price-targets';
 import type { TargetGroupContract } from '@/lib/api/contracts/watchlist';
-import { dec, fmtMoney, fmtPctUnsigned, pctChange } from '@/lib/money';
+import { dec, fmtMoney, fmtPctUnsigned, pctChange, splitMoney } from '@/lib/money';
 
 /**
  * How close a price is to the target lines drawn on it — the ONE place the
@@ -14,9 +14,13 @@ import { dec, fmtMoney, fmtPctUnsigned, pctChange } from '@/lib/money';
  *
  * All arithmetic on `dec()`; only formatted strings leave (non-negotiable
  * #1). Distance is measured RELATIVE TO THE CURRENT PRICE —
- * `|pctChange(price → target)|` — because "3,21% below your line" answers
- * "how far does the price have to move", and that move starts from where the
- * price is now.
+ * `|pctChange(price → target)|` — because the figure answers "how far does
+ * the price have to move", and that move starts from where the price is now.
+ * The sentence says exactly that: "Needs to fall 26,02% to reach your
+ * 110,00 USD line" (plans/2026-09-28-watchlist-grid-extended-hours.md — the
+ * earlier wording put the figure beside the words "above" or "below" your
+ * line, which names a gap it never measured, since the
+ * gap measured from the LINE is a different percentage).
  */
 
 /** "Near a target" means within this many percent of a waiting line —
@@ -51,6 +55,13 @@ function usablePrice(currentPrice: string | null): Decimal | null {
   return price.isZero() ? null : price;
 }
 
+/** The target amount without its currency, for a tile's "to 110" suffix:
+ *  no decimals for a whole target ("110"), two otherwise ("167,70"). String
+ *  typesetting over `fmtMoney` — never parsed back. */
+function shortPrice(target: Decimal, currency: string): string {
+  return splitMoney(fmtMoney(target, currency, target.isInteger() ? 0 : 2)).amount;
+}
+
 /** Smallest distance wins; a tie goes to the OLDEST line. */
 function nearestPending(lines: readonly TargetLine[], price: Decimal): NearestLine | null {
   let best: NearestLine | null = null;
@@ -78,7 +89,11 @@ function nearestPending(lines: readonly TargetLine[], price: Decimal): NearestLi
  * - only hit lines      → `hitOnly` (group `none`, tile says "Hit")
  * - pending, no usable price → group `set`, `side: null`, text `—`
  * - pending, priced     → nearest waiting line; `near` iff distance ≤ 5%
- *   (inclusive); distance zero → "at your … line", `side: null`
+ *   (inclusive); distance zero → "at your … line", `side: null`; otherwise
+ *   "Needs to fall/rise X% to reach your … line"
+ *
+ * `targetShort` is the nearest line's price without currency for the priced
+ * branches, null for hit-only and unpriced.
  */
 export function targetStatusFor(
   lines: readonly TargetLine[],
@@ -98,6 +113,7 @@ export function targetStatusFor(
       side: null,
       near: false,
       hitOnly: true,
+      targetShort: null,
     };
   }
 
@@ -111,6 +127,7 @@ export function targetStatusFor(
       side: null,
       near: false,
       hitOnly: false,
+      targetShort: null,
     };
   }
 
@@ -119,6 +136,7 @@ export function targetStatusFor(
 
   const target = dec(nearest.line.targetPrice);
   const money = fmtMoney(target, currency);
+  const targetShort = shortPrice(target, currency);
   const near = nearest.distance.lte(NEAR_TARGET_THRESHOLD_PCT);
 
   if (nearest.distance.isZero()) {
@@ -128,19 +146,25 @@ export function targetStatusFor(
       side: null,
       near,
       hitOnly: false,
+      targetShort,
     };
   }
 
   // Where the PRICE sits relative to the line, from the live compare — never
-  // the persisted `direction`, which a gapped-past line would contradict.
+  // the persisted `direction`, which a gapped-past line would contradict. A
+  // price above the line has to fall to reach it; below, it has to rise.
   const side = price.lt(target) ? 'below' : 'above';
   const text = fmtPctUnsigned(nearest.distance);
   return {
     text,
-    sentence: `${text} ${side} your ${money} line`,
+    sentence:
+      side === 'above'
+        ? `Needs to fall ${text} to reach your ${money} line`
+        : `Needs to rise ${text} to reach your ${money} line`,
     side,
     near,
     hitOnly: false,
+    targetShort,
   };
 }
 

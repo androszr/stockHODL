@@ -16,6 +16,7 @@ import {
 } from '@/lib/position-engine';
 import type { TrendSlot } from '@/lib/trend/day-trend';
 
+import { computeExtendedSummary } from './extended-summary';
 import { computePortfolioSummary } from './summary';
 
 /**
@@ -54,6 +55,15 @@ export interface HoldingQuote {
   dayLow?: string | null;
   dayVolume?: number | null;
   vwap?: string | null;
+  /**
+   * The per-share extended-hours change amount, decimal string in `currency`
+   * — the numerator of the book-wide extended aggregate
+   * (`computeExtendedSummary`). Optional so every existing composition
+   * compiles; `fetchQuotesBestEffort` and `applyPriceTick` always fill it
+   * beside `extendedChangePct`, so a streamed tick never drops a holding out
+   * of the aggregate while its tile still shows a move.
+   */
+  extendedChangeAmt?: string | null;
   extendedChangePct: string | null;
   extendedKind: 'early' | 'late' | null;
   /**
@@ -190,6 +200,34 @@ export interface LiveMarket {
   serverNowMs: number;
 }
 
+/** One mover chip in the extended-hours box: the ticker and its own move. */
+export interface LiveExtendedMover {
+  symbol: string;
+  pct: LiveFigure;
+}
+
+/**
+ * The whole book at extended-hours prices, ready-made text
+ * (plans/2026-09-28-watchlist-grid-extended-hours.md). Present only while a
+ * pre-market or after-hours session is LIVE and at least one holding traded
+ * in it; the regular-session figures beside it are never folded into it.
+ */
+export interface LiveExtendedSummary {
+  kind: 'early' | 'late';
+  /** "+184,62 zł (+0,26%)" — the combined move in PLN, with percent. */
+  move: LiveFigure;
+  /** The percent half on its own, for a widget with no room for the amount. */
+  movePct: string | null;
+  /** The book's value at extended prices (unpriced holdings at last price). */
+  valueAtExtended: string;
+  /** Holdings with a live extended trade — a count, not money. */
+  pricedCount: number;
+  /** Holdings with shares — a count, not money. */
+  holdingsCount: number;
+  /** Up to three, largest PLN impact first. */
+  movers: LiveExtendedMover[];
+}
+
 export interface LiveSummary {
   totalValue: string | null;
   dayChange: LiveFigure | null;
@@ -214,6 +252,12 @@ export interface LiveSummary {
   partialDayChange: boolean;
   /** The whole book's five-session strip; absent when nothing can be graded. */
   trend?: TrendSlot[];
+  /**
+   * The book's extended-hours move; null outside a live extended session.
+   * Optional so the options summary (which never carries it) and an older
+   * client's decode both stay valid.
+   */
+  extended?: LiveExtendedSummary | null;
 }
 
 /**
@@ -301,6 +345,7 @@ export function applyPriceTick(
     if (pair === null) return quotes;
     updated = {
       ...quote,
+      extendedChangeAmt: pair.amt,
       extendedChangePct: pair.pct,
       extendedKind: status === 'early_trading' ? 'early' : 'late',
       // A live tick is by definition not a completed session's reading — pin
@@ -381,6 +426,7 @@ function composeSlice(
   const open = displayablePositions(computePositions([...engineTxs], quotes, fxRates));
 
   const summary = computePortfolioSummary(open, quotes, fxRates);
+  const extended = computeExtendedSummary(open, quotes, fxRates, summary.totalValuePLN);
 
   const holdings: LiveHolding[] = open.map((p) => {
     // The engine applied the same guard; mirroring it here keeps the card's
@@ -468,6 +514,27 @@ function composeSlice(
         : fmtPct(summary.totalChangePct),
     excludedSymbols: summary.excludedSymbols,
     partialDayChange: summary.partialDayChange,
+    extended:
+      extended === null
+        ? null
+        : {
+            kind: extended.kind,
+            move: {
+              text:
+                extended.movePct === null
+                  ? signedMoney(extended.movePLN, 'PLN')
+                  : `${signedMoney(extended.movePLN, 'PLN')} (${fmtPct(extended.movePct)})`,
+              direction: directionOf(extended.movePLN),
+            },
+            movePct: extended.movePct === null ? null : fmtPct(extended.movePct),
+            valueAtExtended: fmtMoney(extended.valueAtExtendedPLN, 'PLN'),
+            pricedCount: extended.pricedCount,
+            holdingsCount: extended.holdingsCount,
+            movers: extended.movers.map((m) => ({
+              symbol: m.symbol,
+              pct: { text: fmtPct(m.pctDec), direction: directionOf(m.amtDec) },
+            })),
+          },
   };
 
   return { summary: liveSummary, holdings };

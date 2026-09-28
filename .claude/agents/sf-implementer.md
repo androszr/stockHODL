@@ -201,7 +201,8 @@ the orchestrator's dispatch rows bound how many of those there are.
 
 - **Money goes through the money module.** Never `Double(` an amount.
 - **Both plists, both entitlements.** A key added to a Debug file is added to
-  its Release twin in the same pass, except `aps-environment`.
+  its Release twin in the same pass — `aps-environment` included, with
+  `development` in Debug and `production` in Release.
 - **UI on the main actor.** Store mutations that feed a view happen on the
   main actor; long work happens off it and hops back.
 - **Tolerant decode** for any new persisted field.
@@ -223,7 +224,7 @@ IN-FLIGHT: <ids or "none">
 NOTES: <deviations from the plan and why>
 UNCHECKED: <numbered steps a person must follow, then "Why not automated: …" —
   or "nothing; every check above ran">
-FOLLOW-UPS: <out-of-scope work discovered, or "none">
+FOLLOW-UPS: <out-of-scope work discovered that the plan's Out of scope does not name, or "none">
 ```
 
 Do not claim a gate passed that you did not run. If you skipped one, say so.
@@ -243,11 +244,18 @@ the closing note's second sentence states how the result meets, or does not
 meet, that criterion. One plain sentence; the verifier's `Success criterion`
 row is its source, and the person, not you, decides whether it is accepted.
 
-**And flag the card.** If this run is working a Dark Army board card and the tool
-`dark_army_needs_manual_check` is available, call it with those same steps so the
-board shows the card is waiting on a person. Call it **instead of**
-`dark_army_close_card`, never as well as it: a card with an outstanding check is not
-done. A session started before the rename carries the same verbs as `bob_*`;
+**And flag the card, then close it.** If this run is working a Dark Army board
+card, a check you could not make is written first as its own file,
+`manual-check/<YYYY-MM-DD>-<slug>/check.md` at the project root, in the shape
+the implement reference gives (the answer block, `## Steps`, `## Why not
+automated`), and `python3 .claude/skills/ship/manual_check.py` on it prints
+`ok`. Then, when the tool `dark_army_needs_manual_check` is available, call it
+with those same steps and the file's absolute path, so the board shows the
+check is waiting on a person — a badge on the card, not a sentence in a
+terminal somebody has to scroll back to — and **then** `dark_army_close_card`:
+a card with an open check goes to Done, and the check waits in the Checks
+section until a person records Passed or Failed. Flag first, close second;
+never one instead of the other. A session started before the rename carries the same verbs as `bob_*`;
 a session keeps the tool list it was born with.
 
 ## Releasing is not your job

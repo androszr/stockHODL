@@ -52,6 +52,39 @@ describe('widgetSummaryResponseSchema', () => {
     expect(parsed.dayLines?.holdings[0]?.p).toBe('-1.43');
   });
 
+  it('accepts holdings without the extended key — the previous build\'s shape', () => {
+    const parsed = widgetSummaryResponseSchema.parse(base);
+    expect(parsed.holdings.extended).toBeUndefined();
+    expect(widgetSummaryResponseSchema.parse({ ...base, holdings: { ...summary, extended: null } })
+      .holdings.extended).toBeNull();
+  });
+
+  it('accepts holdings.extended during a live extended session', () => {
+    const parsed = widgetSummaryResponseSchema.parse({
+      ...base,
+      market: { ...market, status: 'early_trading' },
+      holdings: {
+        ...summary,
+        extended: {
+          kind: 'early',
+          move: { text: '+184,62 zł (+0,26%)', direction: 'gain' },
+          movePct: '+0,26%',
+          valueAtExtended: '148 434,62 zł',
+          pricedCount: 6,
+          holdingsCount: 8,
+          movers: [
+            { symbol: 'NVDA', pct: { text: '+1,82%', direction: 'gain' } },
+            { symbol: 'AAPL', pct: { text: '-0,40%', direction: 'loss' } },
+            { symbol: 'MSFT', pct: { text: '+0,21%', direction: 'gain' } },
+          ],
+        },
+      },
+    });
+    expect(parsed.holdings.extended?.kind).toBe('early');
+    expect(parsed.holdings.extended?.pricedCount).toBe(6);
+    expect(parsed.holdings.extended?.movers).toHaveLength(3);
+  });
+
   it('refuses a numeric p', () => {
     const result = widgetSummaryResponseSchema.safeParse({
       ...base,
