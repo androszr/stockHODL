@@ -95,6 +95,7 @@ DerivedData/
 /scout/
 /manual-check/
 user-data/
+/.worktrees/
 
 # Design work captures stay local; never published
 docs/design/
