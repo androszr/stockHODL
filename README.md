@@ -226,7 +226,7 @@ Distribution certificates so the workflow never mints another.
 - [docs/ios-native.md](docs/ios-native.md) — the iPhone app's architecture.
 - [docs/setup.md](docs/setup.md) — from clone to signed in, and making it
   yours.
-- [docs/publishing.md](docs/publishing.md) — how this public copy is made.
+- [docs/publishing.md](docs/publishing.md) — what a push publishes and deploys, and the checks to run first.
 
 ## Contributing
 

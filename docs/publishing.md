@@ -1,175 +1,127 @@
-# Publishing a fresh copy of this repository
+# Publishing
 
-The public repository is not this one with its history rewritten. It is a
-fresh copy with a single "initial" commit, built by `scripts/export-public.sh`
-from the working tree, in a folder beside this checkout. The private
-repository stays as it is, as the archive.
+This repository is public, and it is the one you work in. There is no
+separate private copy to export from any more: every commit pushed to `main`
+is published the moment it lands, and it deploys.
 
-Every step below is yours to take; the script and this page never push,
-never change a repository's visibility and never touch a secret on your
-behalf.
+- `origin` is `androszr/stockhodl`, public. Its history starts at one
+  "Initial public release" commit; nothing from before it is here.
+- The old private repository is `androszr/stockhodl-archive`, archived
+  (read-only) with every workflow switched off. A checkout that moved over
+  in place keeps it as the remote `archive` and its full history in a local
+  branch `private-main`. Nothing is ever pushed to it again.
 
-1. **Run the gates, rehearse, then export.** In this checkout, run
-   `pnpm lint`, `pnpm typecheck`, `pnpm test` and `pnpm build`. Then rehearse
-   the export without creating anything:
+## Before every push
 
-   ```bash
-   scripts/export-public.sh --dry-run --check-only
-   ```
+A push is a publication, and a public push cannot really be taken back —
+clones and caches keep what they saw. So before `git push`, rehearse the
+export; it runs the same checks the first public copy passed:
 
-   Expect `export-public: check-only — every check passed; no repository was
-   created and nothing was committed`. It builds the copy in a temporary
-   folder and runs every check on it — the forbidden-content scan, Gitleaks
-   (with the copy's own `.gitleaks.toml`, which allows only the invented cron
-   test secret in its one test file), and the structural checks — then stops
-   before `git init`. Gitleaks is required here: without it the rehearsal
-   stops with `gitleaks is not installed` (exit 4) rather than pass without
-   a secret scan — `brew install gitleaks`, then run it again. (A normal
-   export without Gitleaks carries on but prints `the secret scan was
-   SKIPPED`; do not publish on that.) Plain `--dry-run`
-   without `--check-only` is not a rehearsal: it still makes the commit, in
-   the temporary folder. When the rehearsal is clean:
+```bash
+scripts/export-public.sh --dry-run --check-only
+```
 
-   ```bash
-   scripts/export-public.sh --out ../stockhodl
-   ```
+Expect `export-public: check-only — every check passed; no repository was
+created and nothing was committed`. It copies the tree to a temporary folder
+and scans it: the forbidden-content scan against `.private-strings` (the
+git-ignored file listing your real figures and handles, one per line),
+Gitleaks with the repository's `.gitleaks.toml`, and the structural checks
+(no `plans/`, `.gitnexus/`, `.dark-army/`, `.env` or `.private-strings` in
+the tree). Gitleaks is required: `brew install gitleaks` if it stops with
+exit 4.
 
-   Expect a four-line summary ending in `export-public: commits: 1`, and no
-   `no .private-strings` warning — that file (git-ignored, one real figure or
-   handle per line) is what the scan checks your private numbers against. If it
-   stops with `forbidden content in the copy`, it prints every offending
-   line with its file; fix those in this checkout, empty `../stockhodl`, and
-   run it again. Nothing was committed. (Pick another folder name with
-   `--out` if you like; `--dry-run` builds into a temporary folder instead.)
+If it stops with `forbidden content in the copy`, it prints every offending
+line with its file. Fix those before pushing.
 
-2. **Check who the commit is from.** Run
-   `git -C ../stockhodl log -1 --format=%ae`. Expect
-   `13721474+androszr@users.noreply.github.com`, GitHub's no-reply address for
-   your account, so no personal email is published. To use another address,
-   empty the folder and re-run the export with
-   `EXPORT_AUTHOR_EMAIL=<address> scripts/export-public.sh --out ../stockhodl`
-   (and `EXPORT_AUTHOR_NAME` for the name).
+Pictures are not scanned. A screenshot of the real portfolio passes every
+check above, so keep captures made from real data in `docs/design/`, which
+is git-ignored, and let only the invented-book pictures under `docs/images/`
+be tracked.
 
-3. **Create the public repository, without pushing yet.** Run:
+## What a push to `main` sets off
 
-   ```bash
-   gh repo create stockhodl --public --source=../stockhodl --remote=origin
-   ```
+- **CI** and **Deploy** — every push that touches anything outside `ios/`.
+  Deploy runs the migrations against `DATABASE_URL`, then the production
+  deploy to Vercel. A change to a Vercel environment variable only takes
+  effect on the next deploy.
+- **iOS** — every push that touches `ios/`.
+- **TestFlight** — every push that touches `ios/`, its own workflow file or
+  the two build-number scripts, and **Run workflow** on the Actions tab.
+- **Price alerts** — on its schedule, not on a push. GitHub switches
+  scheduled workflows off in a public repository after 60 days without a
+  push; a push, or re-enabling it on the Actions tab, turns it back on.
 
-   Or on github.com press **New repository**, name it, choose **Public**,
-   leave every "Initialize" box unticked, then run only its
-   `git remote add origin …` line from inside `../stockhodl`. Do not push
-   yet: the first push starts CI, Deploy and TestFlight, and they need the
-   secrets, the build-number variable and the environment from steps 4 and
-   5 first. Expect an empty
-   repository page on GitHub.
+## Secrets come from their source
 
-4. **Re-add the deployment secrets.** On the new repository open
-   **Settings → Secrets and variables → Actions**. Under **Secrets**, press
-   **New repository secret** for each of `ASC_ISSUER_ID`, `ASC_KEY_ID`,
-   `ASC_PRIVATE_KEY`, `CRON_SECRET`, `DATABASE_URL`, `IOS_DIST_P12`,
-   `IOS_DIST_P12_PASSWORD`, `NEON_API_KEY`, `VERCEL_ORG_ID`,
-   `VERCEL_PROJECT_ID` and `VERCEL_TOKEN`, with the same values as in the
-   private repository. Under **Variables**, add `NEON_PROJECT_ID`, and
-   `IOS_BUILD_NUMBER_OFFSET` as step 5 describes. Then open
-   **Settings → Environments**, press **New environment** and name it
-   `production`. Expect eleven secrets, two variables and one environment
-   listed. [docs/setup.md](setup.md) §6 says where each value comes from.
+[docs/setup.md](setup.md) §6 lists every secret and variable and where each
+one comes from. Take each value from that source, never from
+`.env.production.local`: `vercel env pull` writes the same short
+placeholder for every variable marked Sensitive in Vercel, including
+`DATABASE_URL` and `CRON_SECRET`, and a secret copied from it fails at
+run time rather than when it is set. In particular:
 
-5. **Carry the TestFlight build number over, before the first push.** The
-   build number is `IOS_BUILD_NUMBER_OFFSET` + the workflow's run number, and
-   the run number starts again at 1 in the new repository — below the builds
-   App Store Connect already holds, which it refuses. The workflow refuses to
-   run with the variable unset.
-   - **The private repository needs the variable too, today.** Before you
-     push this change there, add `IOS_BUILD_NUMBER_OFFSET` with the value
-     `0` to the private repository (**Settings → Secrets and variables →
-     Actions → Variables**) — otherwise its next push under `ios/` stops red
-     at "Choose the build number". Zero is right there because its run
-     counter already continues past every build it uploaded. The non-zero
-     migration offset below is only for a repository whose counter starts
-     again at 1.
-   - **Stop releases from the old repository first.** In the private
-     repository open **Actions → TestFlight → ⋯ → Disable workflow**. Only
-     one repository may upload at a time; two would hand out the same
-     numbers.
-   - **Read the highest build already used.** In App Store Connect open the
-     app → **TestFlight**, and read the largest build number under the
-     current version (0.1 at the time of writing). Use what it says on the
-     day — the last build was 29 when this was written, but do not assume it
-     still is.
-   - **Set the offset to that number.** In the new repository, under
-     **Settings → Secrets and variables → Actions → Variables**, add
-     `IOS_BUILD_NUMBER_OFFSET` with it. With 29, the first run uploads build
-     30 and the second 31.
-   - **Leave it alone afterwards.** The offset is fixed for the life of that
-     repository and its TestFlight workflow. Change it only when the run
-     counter restarts again (another new repository, or the workflow deleted
-     and recreated), and then by the same steps. A brand-new app with no
-     builds sets `0` — explicitly; unset is refused.
-   - **Retry with a new run, never a re-run.** A re-run reuses the run number,
-     and the failed attempt may already have uploaded under it, so the
-     workflow refuses it (`this is attempt 2 …`). After a failure — even one
-     before signing — press **Actions → TestFlight → Run workflow**.
+- `APPLE_TEAM_ID` is the ten-character team in brackets on your Apple
+  Distribution certificate, the same value as `DEVELOPMENT_TEAM` in
+  `ios/Config/Base.xcconfig`.
+- `DATABASE_URL` is the pooled connection string (host ending in `-pooler`)
+  for the production branch, from the Neon console's **Connect** dialog.
+- `CRON_SECRET` cannot be read back from Vercel. To replace it, generate a
+  new one and set it in both places, then deploy:
 
-6. **Lock the doors a public repository opens.**
-   - **Settings → Code security** (or *Advanced Security*) → enable
-     **Private vulnerability reporting**. Expect a **Report a vulnerability**
-     button on the Security tab, which is where [SECURITY.md](../SECURITY.md)
-     sends people.
-   - **Settings → Actions → General** → under *Fork pull request workflows
-     from outside collaborators*, choose **Require approval for all outside
-     collaborators**. Expect no workflow to run on a stranger's pull request
-     until you approve it.
-   - Note: GitHub switches off scheduled workflows (the price-alerts trigger)
-     in a public repository after 60 days without a push. A push, or
-     re-enabling the workflow on the Actions tab, turns it back on.
+  ```bash
+  NEW=$(openssl rand -hex 32)
+  printf '%s' "$NEW" | gh secret set CRON_SECRET -R androszr/stockhodl
+  vercel env rm CRON_SECRET production --yes
+  printf '%s' "$NEW" | vercel env add CRON_SECRET production
+  unset NEW
+  ```
+- `ASC_KEY_ID` and `ASC_PRIVATE_KEY` must be the same key: the ID is the
+  part of the `.p8` file's name after `AuthKey_`.
 
-7. **Move your working copy over.** Copy the local-only files the export
-   leaves out into the new folder:
+## The TestFlight build number
 
-   ```bash
-   cp .env .env.production.local .private-strings ../stockhodl/
-   cp assets/illustrated/look-reference.jpg ../stockhodl/assets/illustrated/
-   cp -R .vercel .dark-army ../stockhodl/
-   cp -R plans ../stockhodl/      # optional — it is ignored there too
-   cd ../stockhodl && pnpm install && pnpm ios:gen && git status
-   ```
+The build number is `IOS_BUILD_NUMBER_OFFSET` plus the workflow's run
+number, and App Store Connect refuses a number it already holds. The
+workflow refuses to run with the variable unset.
 
-   Expect `git status` to say the working tree is clean: all of these are ignored,
-   and the regenerated Swift matches what was committed.
+- **Set it once per repository.** A repository taking over an existing app
+  sets it to the highest build number App Store Connect already holds for
+  the current version (App Store Connect → the app → **TestFlight**; open
+  **Build Uploads** too, since builds still processing count). A brand-new
+  app sets `0`, explicitly. `androszr/stockhodl` took over at 34.
+- **Leave it alone afterwards.** Change it only when the run counter starts
+  again at 1 — another new repository, or the workflow deleted and
+  recreated — and then by the same rule.
+- **Only one repository uploads at a time.** Before another repository takes
+  over, disable TestFlight in the one handing over (**Actions → TestFlight →
+  ⋯ → Disable workflow**); two would hand out the same numbers.
+- **Retry with a new run, never a re-run.** A re-run reuses the run number,
+  and the failed attempt may already have uploaded under it, so the
+  workflow refuses it (`this is attempt 2 …`). After a failure press
+  **Actions → TestFlight → Run workflow**. A number used by a failed run is
+  simply skipped.
 
-8. **Point Dark Army at the new folder.** In Dark Army open
-   **Settings → Projects** → **Enrol a folder…** and pick `../stockhodl`.
-   Expect the project's tab on **Agents**, and new cards starting there.
+## The doors a public repository opens
 
-9. **Push, and deploy from the new repository.** If Vercel complains about
-   the project link, run `vercel link` inside `../stockhodl` and check that
-   `.vercel/project.json` names the same project id as the
-   `VERCEL_PROJECT_ID` secret. Then, inside `../stockhodl`, run
-   `git push -u origin main`. This first push runs **CI** and **Deploy** (and
-   TestFlight, because it contains `ios/`): check with `gh run list --limit 4`
-   about two minutes later and expect `CI` and `Deploy` green. Expect the
-   repository page showing one commit and the README with the bull icon.
-   The TestFlight run's summary names its build: the offset from step 5
-   plus 1 (30, with an offset of 29).
+Both are set on `androszr/stockhodl`; check them again if the repository is
+ever recreated.
 
-10. **Retake the screenshots when the screens change.** They are already
-    in the README, drawn from an invented portfolio (about 70 238 zł, eight
-    stocks, two calls). From the repository root:
+- **Settings → Advanced Security** → **Private vulnerability reporting** on,
+  which is where [SECURITY.md](../SECURITY.md) sends people.
+- **Settings → Actions → General** → *Fork pull request workflows from
+  outside collaborators* → **Require approval for all outside
+  collaborators**.
 
-    ```bash
-    python3 tools/demo_shots.py all
-    ```
+## Screenshots
 
-    Expect four pictures under `docs/images/` and `check: invented book`.
-    The simulator it creates is deleted when the run finishes. Never point
-    it at the real portfolio.
+The README's pictures are drawn from an invented portfolio (about 70 238 zł,
+eight stocks, two calls). Retake them when the screens change, from the
+repository root:
 
-11. **Leave the archive alone.** The private archive repository stays
-    private and untouched. Optionally add one line to its description saying where the
-    public repository lives.
+```bash
+python3 tools/demo_shots.py all
+```
 
-What this runbook does not do: it never pushes, never changes a repository's
-visibility and never touches secrets on your behalf. Every one of those is a
-step you take above.
+Expect four pictures under `docs/images/` and `check: invented book`. The
+simulator it creates is deleted when the run finishes. Never point it at the
+real portfolio.
