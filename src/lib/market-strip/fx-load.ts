@@ -57,15 +57,67 @@ async function fetchDaily(todayISO: string): Promise<Candle[]> {
   });
 }
 
-/** One best-effort call: a throw becomes `[]` and a console line. */
-async function bestEffort(label: string, call: () => Promise<Candle[]>): Promise<Candle[]> {
-  try {
-    return await call();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : `${label} fetch failed`;
-    console.error(`Market strip fx ${label} failed (${FX_TICKER}): ${message}`);
-    return [];
-  }
+/**
+ * Why the bars are HELD here, on top of `massive.ts`'s 60 s minute-bar cache
+ * (2026-09-28). The key's currency plan is rate-limited far tighter than its
+ * stocks plan: production logged `HTTP 429` on `C:USDPLN` whenever the phone
+ * foregrounded, because the Dashboard, a pull-to-refresh and the widgets land
+ * as several strip requests in the same few seconds — each a cache MISS while
+ * the first is still in flight, and the daily call was never cached at all.
+ * Every 429 blanked the tile to "—" until the next lucky poll.
+ *
+ * So, per call: one in-flight fetch shared by every concurrent request; a
+ * success held for its TTL (the minute bars grow every minute, the daily bars
+ * once a day); and a failure answered with the last good bars while they are
+ * younger than `MAX_HELD_AGE_MS`. The bars are delayed data either way — a
+ * rate a minute or two older beats an empty tile. Only an instance that has
+ * never had a success still returns nothing.
+ */
+type FxCall = 'intraday' | 'daily';
+
+const FRESH_MS: Record<FxCall, number> = { intraday: 60_000, daily: 15 * 60_000 };
+/** Past this, held bars are too old to stand in for a failed call. */
+const MAX_HELD_AGE_MS = 6 * 60 * 60_000;
+
+const held = new Map<FxCall, { at: number; candles: Candle[] }>();
+const inFlight = new Map<FxCall, Promise<Candle[]>>();
+
+/** Test seam: forget held bars between cases. */
+export function resetFxHeldBarsForTests(): void {
+  held.clear();
+  inFlight.clear();
+}
+
+/** One best-effort call: a throw becomes the held bars (or `[]`) and a console line. */
+async function bestEffort(label: FxCall, call: () => Promise<Candle[]>): Promise<Candle[]> {
+  const now = Date.now();
+  const last = held.get(label);
+  if (last && now - last.at < FRESH_MS[label]) return last.candles;
+
+  const pending = inFlight.get(label);
+  if (pending) return pending;
+
+  const fallback = (): Candle[] => {
+    const stillHeld = held.get(label);
+    return stillHeld && Date.now() - stillHeld.at < MAX_HELD_AGE_MS ? stillHeld.candles : [];
+  };
+
+  const request = (async () => {
+    try {
+      const candles = await call();
+      if (candles.length === 0) return fallback();
+      held.set(label, { at: Date.now(), candles });
+      return candles;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `${label} fetch failed`;
+      console.error(`Market strip fx ${label} failed (${FX_TICKER}): ${message}`);
+      return fallback();
+    } finally {
+      inFlight.delete(label);
+    }
+  })();
+  inFlight.set(label, request);
+  return request;
 }
 
 /**
