@@ -192,41 +192,16 @@ struct SignedInView: View {
     /// matters. It is not `@Observable`, so it never re-renders this view.
     @State private var routeStores = RouteStores()
 
-    var body: some View {
-        VStack(spacing: 0) {
-            TopBar(
-                mode: topBarMode,
-                add: TopBarAdd.current(tab: tab, destination: currentDestination),
-                edit: TopBarEdit.current(
-                    tab: tab,
-                    destination: currentDestination,
-                    hasItems: watchlist?.items.isEmpty == false
-                ),
-                isEditing: isEditingWatchlist,
-                onBack: popCurrent,
-                onAdd: performAdd,
-                onToggleEdit: { isEditingWatchlist.toggle() },
-                onSearch: { isSearching = true },
-                onProfile: { isShowingProfile = true }
-            )
-            .zIndex(1)
+    #if os(macOS)
+        /// The Mac sidebar's selection. Derived from `tab` + `paths` whenever
+        /// those move (a push deep link, a tap inside a screen), and turned
+        /// back into them when the user clicks a row — so the phone's tab
+        /// model stays the one source of truth underneath both shells.
+        @State private var section: MacSidebarSection? = .dashboard
+    #endif
 
-            TabView(selection: $tab) {
-                ForEach(AppTab.allCases, id: \.self) { item in
-                    tabStack(item)
-                        .tabItem { Label(item.title, systemImage: item.systemImage) }
-                        .tag(item)
-                }
-            }
-            .tint(Color(Tokens.accent))
-            .modifier(HardTopScrollEdge())
-        }
-        .background(Color(Tokens.surface0))
-        // The tab bar handles the bottom inset on its own. The top cap is
-        // the `TopBar` fill, which ignores the top safe area so it paints
-        // into the island the way the web bar paints into
-        // `env(safe-area-inset-top)`.
-        .ignoresSafeArea(.container, edges: .bottom)
+    var body: some View {
+        shell
         .onChange(of: currentDestination) { _, dest in
             // The add binding outlives the journal: popping while the sheet
             // is up would otherwise reopen it the next time the route is
@@ -330,6 +305,117 @@ struct SignedInView: View {
             await live?.start()
         }
     }
+
+    /// The window's frame: the phone's top bar over a `TabView`, or the Mac's
+    /// sidebar beside the same per-tab stacks. Everything below the frame —
+    /// the stores, the sheets, the scene and push wiring — is `body`'s, once.
+    @ViewBuilder
+    private var shell: some View {
+        #if os(macOS)
+            macBody
+        #else
+            phoneBody
+        #endif
+    }
+
+    #if os(iOS)
+        private var phoneBody: some View {
+            VStack(spacing: 0) {
+                TopBar(
+                    mode: topBarMode,
+                    add: TopBarAdd.current(tab: tab, destination: currentDestination),
+                    edit: TopBarEdit.current(
+                        tab: tab,
+                        destination: currentDestination,
+                        hasItems: watchlist?.items.isEmpty == false
+                    ),
+                    isEditing: isEditingWatchlist,
+                    onBack: popCurrent,
+                    onAdd: performAdd,
+                    onToggleEdit: { isEditingWatchlist.toggle() },
+                    onSearch: { isSearching = true },
+                    onProfile: { isShowingProfile = true }
+                )
+                .zIndex(1)
+
+                TabView(selection: $tab) {
+                    ForEach(AppTab.allCases, id: \.self) { item in
+                        tabStack(item)
+                            .tabItem { Label(item.title, systemImage: item.systemImage) }
+                            .tag(item)
+                    }
+                }
+                .tint(Color(Tokens.accent))
+                .modifier(HardTopScrollEdge())
+            }
+            .background(Color(Tokens.surface0))
+            // The tab bar handles the bottom inset on its own. The top cap is
+            // the `TopBar` fill, which ignores the top safe area so it paints
+            // into the island the way the web bar paints into
+            // `env(safe-area-inset-top)`.
+            .ignoresSafeArea(.container, edges: .bottom)
+        }
+    #endif
+
+    #if os(macOS)
+        /// The Mac window (plans/2026-09-28-native-mac-app-stage-1.md): the
+        /// eight sections in a sidebar, the section's stack as the detail, and
+        /// the phone bar's actions — Edit/Done, add, search, profile — in the
+        /// window toolbar, calling the same functions the bar does.
+        private var macBody: some View {
+            NavigationSplitView {
+                MacSidebar(selection: $section)
+            } detail: {
+                tabStack(tab)
+                    .id(tab)
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .primaryAction) {
+                    if let edit = TopBarEdit.current(
+                        tab: tab,
+                        destination: currentDestination,
+                        hasItems: watchlist?.items.isEmpty == false
+                    ) {
+                        Button(isEditingWatchlist ? "Done" : "Edit") { isEditingWatchlist.toggle() }
+                            .accessibilityLabel(edit.accessibilityLabel)
+                            .accessibilityValue(isEditingWatchlist ? "Editing" : "Not editing")
+                    }
+                    if let add = TopBarAdd.current(tab: tab, destination: currentDestination) {
+                        Button(action: performAdd) {
+                            Label(add.accessibilityLabel, systemImage: "plus")
+                        }
+                        .help(add.accessibilityLabel)
+                    }
+                    Button { isSearching = true } label: {
+                        Label("Find a stock", systemImage: "magnifyingglass")
+                    }
+                    .help("Find a stock")
+                    Button { isShowingProfile = true } label: {
+                        Label("Profile", systemImage: "person.crop.circle")
+                    }
+                    .help("Profile")
+                }
+            }
+            .tint(Color(Tokens.accent))
+            .background(Color(Tokens.surface0))
+            .frame(minWidth: 900, minHeight: 600)
+            .onChange(of: section) { _, picked in
+                guard let picked else { return }
+                // Already there (the row was re-derived from a push, or the
+                // stack is deeper inside the same section): leave the path be.
+                guard picked != MacSidebarSection.section(for: tab, path: paths[tab] ?? []) else { return }
+                tab = picked.tab
+                paths[picked.tab] = picked.route.map { [$0] } ?? []
+            }
+            .onChange(of: tab) { _, _ in syncSection() }
+            .onChange(of: paths) { _, _ in syncSection() }
+        }
+
+        private func syncSection() {
+            let derived = MacSidebarSection.section(for: tab, path: paths[tab] ?? [])
+            if section != derived { section = derived }
+        }
+    #endif
 
     /// Foreground and background, forwarded to every store that owns a live
     /// cadence. Each one decides for itself whether it has anything to resume.

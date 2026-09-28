@@ -1,51 +1,92 @@
 import SwiftUI
-import UIKit
+#if canImport(UIKit)
+    import UIKit
+#elseif canImport(AppKit)
+    import AppKit
+#endif
 
 /// The bridge from a design token to something SwiftUI can paint.
 ///
 /// Kept apart from `OKLCH.swift` on purpose: the math has no UI framework
 /// import and is therefore testable anywhere, while everything in this file
-/// needs UIKit. That split is what lets `OKLCHTests` run without a simulator.
+/// needs UIKit (AppKit on the Mac). That split is what lets `OKLCHTests` run
+/// without a simulator.
 ///
 /// No color literal appears here — non-negotiable #2. Every value comes from
 /// `Tokens.swift`, which is generated from `src/styles/tokens.css`.
 
-extension UIColor {
-    /// Renders into Display P3, which is what the screen actually is.
-    ///
-    /// Three of this palette's tokens (`sparkline-loss` dark, `gain` light,
-    /// `sparkline-gain` light) sit OUTSIDE sRGB and inside P3, so going through
-    /// sRGB would visibly dull them — including against a browser rendering the
-    /// same `oklch()` value on the same phone. `OKLCHTests` pins that.
-    convenience init(_ oklch: OKLCH) {
-        let rgb = oklch.displayP3
-        self.init(
-            displayP3Red: CGFloat(rgb.red),
-            green: CGFloat(rgb.green),
-            blue: CGFloat(rgb.blue),
-            alpha: 1
-        )
-    }
+#if canImport(UIKit)
+    extension UIColor {
+        /// Renders into Display P3, which is what the screen actually is.
+        ///
+        /// Three of this palette's tokens (`sparkline-loss` dark, `gain` light,
+        /// `sparkline-gain` light) sit OUTSIDE sRGB and inside P3, so going through
+        /// sRGB would visibly dull them — including against a browser rendering the
+        /// same `oklch()` value on the same phone. `OKLCHTests` pins that.
+        convenience init(_ oklch: OKLCH) {
+            let rgb = oklch.displayP3
+            self.init(
+                displayP3Red: CGFloat(rgb.red),
+                green: CGFloat(rgb.green),
+                blue: CGFloat(rgb.blue),
+                alpha: 1
+            )
+        }
 
-    /// Follows the system appearance. A dynamic `UIColor` re-resolves itself
-    /// when the trait collection changes, so a view painted with one does not
-    /// need to observe anything to switch on a light/dark toggle.
-    convenience init(_ token: DesignToken) {
-        self.init { traits in
-            UIColor(token.value(for: traits.userInterfaceStyle == .light ? .light : .dark))
+        /// Follows the system appearance. A dynamic `UIColor` re-resolves itself
+        /// when the trait collection changes, so a view painted with one does not
+        /// need to observe anything to switch on a light/dark toggle.
+        convenience init(_ token: DesignToken) {
+            self.init { traits in
+                UIColor(token.value(for: traits.userInterfaceStyle == .light ? .light : .dark))
+            }
         }
     }
-}
 
-extension Color {
-    init(_ oklch: OKLCH) {
-        self.init(uiColor: UIColor(oklch))
+    extension Color {
+        init(_ oklch: OKLCH) {
+            self.init(uiColor: UIColor(oklch))
+        }
+
+        init(_ token: DesignToken) {
+            self.init(uiColor: UIColor(token))
+        }
+    }
+#elseif canImport(AppKit)
+    extension NSColor {
+        /// Display P3, for the same reason as the UIKit bridge above: three
+        /// tokens sit outside sRGB and would dull if flattened.
+        convenience init(_ oklch: OKLCH) {
+            let rgb = oklch.displayP3
+            self.init(
+                displayP3Red: CGFloat(rgb.red),
+                green: CGFloat(rgb.green),
+                blue: CGFloat(rgb.blue),
+                alpha: 1
+            )
+        }
+
+        /// Follows the window's appearance. A dynamic `NSColor` re-resolves
+        /// itself whenever the drawing appearance changes, like the dynamic
+        /// `UIColor` on the phone.
+        convenience init(_ token: DesignToken) {
+            self.init(name: nil) { appearance in
+                let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                return NSColor(token.value(for: isDark ? .dark : .light))
+            }
+        }
     }
 
-    init(_ token: DesignToken) {
-        self.init(uiColor: UIColor(token))
+    extension Color {
+        init(_ oklch: OKLCH) {
+            self.init(nsColor: NSColor(oklch))
+        }
+
+        init(_ token: DesignToken) {
+            self.init(nsColor: NSColor(token))
+        }
     }
-}
+#endif
 
 extension Direction {
     /// Direction → token, so a sign is never turned into a color at the call

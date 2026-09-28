@@ -1,5 +1,9 @@
 import SwiftUI
-import UIKit
+#if canImport(UIKit)
+    import UIKit
+#elseif canImport(AppKit)
+    import AppKit
+#endif
 
 /// A picture that arrives over a bearer-guarded route.
 ///
@@ -18,13 +22,13 @@ struct NewsImage<Placeholder: View>: View {
     let contentMode: ContentMode
     @ViewBuilder let placeholder: () -> Placeholder
 
-    @State private var image: UIImage?
+    @State private var image: PlatformImage?
 
     var body: some View {
         ZStack {
             placeholder()
             if let image {
-                Image(uiImage: image)
+                Image(platformImage: image)
                     .resizable()
                     .aspectRatio(contentMode: contentMode)
                     .transition(.opacity)

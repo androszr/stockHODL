@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The Mac build's entitlements (plans/2026-09-28-native-mac-app-stage-1.md).
+	     ONE file for both configurations in this stage: Debug.xcconfig and
+	     Release.xcconfig each point `CODE_SIGN_ENTITLEMENTS[sdk=macosx*]` here.
+	     The Mac build is local-only, run from Xcode; the Mac release-pipeline
+	     card adds a `production` twin and teaches check-entitlements.py the
+	     macOS spelling. The iOS Debug/Release pair is not touched by this file.
+
+	     Three values must stay identical to the iOS pair — the app group, the
+	     keychain scope and the associated domain — and
+	     scripts/tests/test_macos_entitlements.py pins them. -->
+
+	<!-- Every Mac app that reads an App Group container or a data-protection
+	     keychain group has to be sandboxed; the sandbox is also what a later
+	     Mac App Store build requires. -->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+
+	<!-- Outgoing connections only: the API host and the live-quote stream. A
+	     sandboxed app without it cannot open a socket at all. -->
+	<key>com.apple.security.network.client</key>
+	<true/>
+
+	<!-- The screenshot import's "Choose a file…" panel. Read-only: the app
+	     never writes where the user points it. Drop and paste need nothing. -->
+	<key>com.apple.security.files.user-selected.read-only</key>
+	<true/>
+
+	<!-- The same group the phone and its widget share; a literal for the same
+	     reason as in StockHODL.entitlements (SnapshotStore.swift names it). -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.robertandrosz.stockhodl</string>
+	</array>
+
+	<!-- The shared keychain scope, expanded from the build setting in
+	     Base.xcconfig. On the Mac an access group only works in the
+	     data-protection keychain, which is why KeychainTokenStore sets
+	     kSecUseDataProtectionKeychain; without this entitlement that query
+	     answers -34018. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(KEYCHAIN_ACCESS_GROUP)</string>
+	</array>
+
+	<!-- Passkeys: the rpID is the API host, and the Mac build is pointed at
+	     production (Debug.xcconfig) because no association file exists at
+	     localhost. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:sawa-finance.vercel.app</string>
+	</array>
+
+	<!-- The macOS spelling of the push entitlement; the iOS key
+	     `aps-environment` is not valid on the Mac. `development` = the sandbox
+	     APNs host, correct for a build run from Xcode. The server replays a
+	     BadDeviceToken against the other host, so it needs no change. -->
+	<key>com.apple.developer.aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

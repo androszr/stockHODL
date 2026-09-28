@@ -1,4 +1,8 @@
-import UIKit
+#if os(iOS)
+    import UIKit
+#else
+    import AppKit
+#endif
 import UserNotifications
 
 /// The UIKit half of push: capturing the APNs device token and a tapped
@@ -9,34 +13,74 @@ import UserNotifications
 /// methods are declared `nonisolated` in the SDK, while `UIApplicationDelegate`
 /// makes this whole type main-actor — without it Swift 6 sees the two
 /// conformances as crossing an isolation boundary and refuses to build.
-final class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotificationCenterDelegate {
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
-    ) -> Bool {
-        UNUserNotificationCenter.current().delegate = self
-        return true
-    }
+#if os(iOS)
+    final class AppDelegate: NSObject, UIApplicationDelegate, @preconcurrency UNUserNotificationCenterDelegate {
+        func application(
+            _ application: UIApplication,
+            didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+        ) -> Bool {
+            UNUserNotificationCenter.current().delegate = self
+            return true
+        }
 
-    func application(
-        _ application: UIApplication,
-        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
-    ) {
-        let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
-        Task { @MainActor in
-            PushCoordinator.shared.deviceToken = hex
+        func application(
+            _ application: UIApplication,
+            didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+        ) {
+            let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
+            Task { @MainActor in
+                PushCoordinator.shared.deviceToken = hex
+            }
+        }
+
+        func application(
+            _ application: UIApplication,
+            didFailToRegisterForRemoteNotificationsWithError error: Error
+        ) {
+            #if DEBUG
+                print("[push] remote registration failed: \(error)")
+            #endif
         }
     }
+#else
+    /// The AppKit half of push on the Mac: the same two callbacks, the same hex
+    /// encoding, the same forwarding to `PushCoordinator`. No `@preconcurrency`
+    /// here: the macOS SDK's conformance needs none, and the compiler says so.
+    final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+        func applicationDidFinishLaunching(_ notification: Notification) {
+            UNUserNotificationCenter.current().delegate = self
+        }
 
-    func application(
-        _ application: UIApplication,
-        didFailToRegisterForRemoteNotificationsWithError error: Error
-    ) {
-        #if DEBUG
-            print("[push] remote registration failed: \(error)")
-        #endif
+        /// The window IS the app: its stores own the sign-in and the live
+        /// pumps, so nothing may keep running once it is closed.
+        func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+            true
+        }
+
+        func application(
+            _ application: NSApplication,
+            didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+        ) {
+            let hex = deviceToken.map { String(format: "%02x", $0) }.joined()
+            Task { @MainActor in
+                PushCoordinator.shared.deviceToken = hex
+            }
+        }
+
+        func application(
+            _ application: NSApplication,
+            didFailToRegisterForRemoteNotificationsWithError error: Error
+        ) {
+            #if DEBUG
+                print("[push] remote registration failed: \(error)")
+            #endif
+        }
     }
+#endif
 
+/// The notification-centre half, shared by both platforms so the tap →
+/// `PushDeepLink` → `pendingDestination` path exists once.
+extension AppDelegate {
     /// Foreground presentation: a price move is exactly the kind of thing
     /// worth surfacing immediately, so the banner shows even while the app is
     /// already open rather than being silently swallowed (`UNUserNotificationCenter`'s
