@@ -1,6 +1,6 @@
 ---
 name: sf-implementer
-model: claude-opus-5-5
+model: claude-sonnet-5-5
 description: Executes an accepted stock-follow plan end-to-end — source, tests,
   config — then runs the gates from docs/context.md and reports
   complete/partial/blocked. Never commits, never pushes, never edits the plan's

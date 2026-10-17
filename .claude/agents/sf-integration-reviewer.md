@@ -1,6 +1,6 @@
 ---
 name: sf-integration-reviewer
-model: sonnet
+model: claude-sonnet-5-5
 description: Asks whether a stock-follow change still works once it is built,
   installed or deployed for real, not only in the test suite — packaging,
   configuration, persisted data from an older version, CI and the release
