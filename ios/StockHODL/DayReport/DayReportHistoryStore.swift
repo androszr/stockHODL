@@ -14,6 +14,9 @@ import Observation
 @MainActor
 final class DayReportHistoryStore {
     private(set) var items: [DayReportHistoryItem] = []
+    /// `items` folded to one entry per day, newest first. Spans every loaded
+    /// page (computed, so `loadMore()` is reflected at once).
+    var days: [DayReportHistoryDay] { DayReportHistoryDay.group(items) }
     private(set) var nextCursor: String?
     private(set) var isLoading = false
     private(set) var isLoadingMore = false

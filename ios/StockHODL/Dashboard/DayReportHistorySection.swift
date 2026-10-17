@@ -1,9 +1,10 @@
 import SwiftUI
 
-/// The Dashboard's "Day reports" list — one row per report the server has
-/// written, newest first, each a push to the SAME `Route.dayReport` the
-/// notification tap reaches, so a past day is one tap away rather than gone
-/// with its notification.
+/// The Dashboard's "Day reports" list — one row per day, newest first, with an
+/// "Open" (morning brief) and a "Close" (close report) link per half that
+/// exists, each a push to the SAME `Route.dayReport` the notification tap
+/// reaches, so a past day is one tap away rather than gone with its
+/// notification. The figure is the close report's own move, a dash without one.
 ///
 /// Every string on a row arrives formatted from the server (the figure is
 /// the one the report stored when it was written); this view only lays them
@@ -53,11 +54,8 @@ struct DayReportHistorySection: View {
 
     private var list: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(store.items, id: \.rowID) { item in
-                NavigationLink(value: Self.route(for: item)) {
-                    DayReportHistoryRow(item: item)
-                }
-                .buttonStyle(.plain)
+            ForEach(store.days) { day in
+                DayReportHistoryRow(day: day)
                 Divider().overlay(Color(Tokens.surface1))
             }
 
@@ -83,97 +81,94 @@ struct DayReportHistorySection: View {
 
     // MARK: - Pure helpers (pinned by DayReportHistoryViewTests)
 
-    static func kindLabel(_ kind: DayReportPayloadKind) -> String {
-        switch kind {
-        case .morning: "Morning brief"
-        case .close: "Close report"
-        }
-    }
-
     /// The SAME route value `stockhodl://day-report/<day>?kind=…` produces,
-    /// so the row opens exactly what the notification would have.
-    static func route(for item: DayReportHistoryItem) -> Route {
-        Route.dayReport(day: item.day, kind: DayReportKind(item.kind))
+    /// so a link opens exactly what the notification would have.
+    static func route(for day: DayReportHistoryDay, kind: DayReportKind) -> Route {
+        Route.dayReport(day: day.day, kind: kind)
     }
 
     /// The latest reportable day (nil = the server picks it) opened on its
     /// morning half, which exists from the moment the day begins.
     static let todayRoute = Route.dayReport(day: nil, kind: .morning)
 
-    /// A morning brief recaps the PREVIOUS session, so its figure is captioned
-    /// with the session it describes. Nil when the figure is the row's own
-    /// day (a close report) or when there is no figure to caption.
-    static func changeCaption(_ item: DayReportHistoryItem) -> String? {
-        guard let label = item.figureDayLabel, item.figureDay != item.day else { return nil }
-        return "\(label) close"
+    static func linkTitle(_ kind: DayReportKind) -> String {
+        switch kind {
+        case .morning: "Open"
+        case .close: "Close"
+        }
     }
 
-    /// "—" when the report stored no figure; "At least …" when it was partial.
-    static func changeText(_ item: DayReportHistoryItem) -> String {
-        guard let change = item.dayChange else { return "—" }
-        return DayReportView.headline(change.text, partial: item.partial)
+    static func linkAccessibilityLabel(kind: DayReportKind, dayLabel: String) -> String {
+        switch kind {
+        case .morning: "Open morning brief for \(dayLabel)"
+        case .close: "Open close report for \(dayLabel)"
+        }
+    }
+
+    /// The day's figure comes from the close report only: "—" without one (or
+    /// without a stored figure), "At least …" when the close was partial.
+    static func changeText(_ day: DayReportHistoryDay) -> String {
+        guard let close = day.close, let change = close.dayChange else { return "—" }
+        return DayReportView.headline(change.text, partial: close.partial)
+    }
+
+    static func rowAccessibilityLabel(_ day: DayReportHistoryDay) -> String {
+        var parts = [day.dayLabel, changeText(day)]
+        if let pct = day.close?.dayChangePct { parts.append(pct) }
+        return parts.joined(separator: ", ")
     }
 }
 
-/// One row: the day and the half on the left, the day's move on the right.
-/// A `HStack` of `VStack`s with no fixed heights beyond the 44 pt minimum,
-/// so Dynamic Type reflows it; the FIGURE truncates, never the label.
+/// One row per day: the day, its "Open" / "Close" links, and the close
+/// report's move on the right. The row body is inert; only the links navigate.
+/// Dynamic Type reflows it; the FIGURE truncates, never the label.
 private struct DayReportHistoryRow: View {
-    let item: DayReportHistoryItem
+    let day: DayReportHistoryDay
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.dayLabel)
-                    .font(.system(.subheadline, weight: .semibold))
-                    .foregroundStyle(Color(Tokens.textPrimary))
-                Text(DayReportHistorySection.kindLabel(item.kind))
-                    .font(.caption)
-                    .foregroundStyle(Color(Tokens.textMuted))
+            Text(day.dayLabel)
+                .font(.system(.subheadline, weight: .semibold))
+                .foregroundStyle(Color(Tokens.textPrimary))
+                .accessibilityLabel(DayReportHistorySection.rowAccessibilityLabel(day))
+            HStack(spacing: 4) {
+                if day.morning != nil { link(.morning) }
+                if day.close != nil { link(.close) }
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(DayReportHistorySection.changeText(item))
+            HStack(spacing: 6) {
+                Text(DayReportHistorySection.changeText(day))
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .foregroundStyle(Color(figureToken))
+                if let pct = day.close?.dayChangePct {
+                    Text("(\(pct))")
                         .monospacedDigit()
                         .lineLimit(1)
-                        .foregroundStyle(Color(item.dayChange?.direction.token ?? Tokens.textMuted))
-                    if let pct = item.dayChangePct {
-                        Text("(\(pct))")
-                            .monospacedDigit()
-                            .lineLimit(1)
-                            .foregroundStyle(Color(item.dayChange?.direction.token ?? Tokens.textMuted))
-                    }
-                }
-                .font(.subheadline)
-                if let caption = DayReportHistorySection.changeCaption(item) {
-                    Text(caption)
-                        .font(.caption2)
-                        .foregroundStyle(Color(Tokens.textMuted))
-                        .lineLimit(1)
+                        .foregroundStyle(Color(figureToken))
                 }
             }
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(Color(Tokens.textMuted))
-                .accessibilityHidden(true)
+            .font(.subheadline)
+            .accessibilityHidden(true)
         }
-        .frame(minHeight: 44)
         .padding(.vertical, 6)
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
     }
 
-    private var accessibilityLabel: String {
-        var parts = [
-            item.dayLabel,
-            DayReportHistorySection.kindLabel(item.kind),
-            DayReportHistorySection.changeText(item),
-        ]
-        if let pct = item.dayChangePct { parts.append(pct) }
-        if let caption = DayReportHistorySection.changeCaption(item) { parts.append(caption) }
-        return parts.joined(separator: ", ")
+    private var figureToken: DesignToken {
+        day.close?.dayChange?.direction.token ?? Tokens.textMuted
+    }
+
+    private func link(_ kind: DayReportKind) -> some View {
+        NavigationLink(value: DayReportHistorySection.route(for: day, kind: kind)) {
+            Text(DayReportHistorySection.linkTitle(kind))
+                .font(.subheadline)
+                .foregroundStyle(Color(Tokens.accent))
+        }
+        .buttonStyle(.plain)
+        .quietHitRegion()
+        .accessibilityLabel(
+            DayReportHistorySection.linkAccessibilityLabel(kind: kind, dayLabel: day.dayLabel)
+        )
     }
 }
 

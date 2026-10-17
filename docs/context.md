@@ -1099,10 +1099,10 @@ change must work on every iPhone size the app already supports.
 
   **Day-report history on the Dashboard (2026-09-20,
   plans/2026-09-20-day-report-history-on-dashboard.md).** The bottom of the
-  Dashboard lists every report the app has WRITTEN — one row per
-  `day_reports` row with `status IN ('ready','refused')` (a `pending` row is
-  a 15-minute reservation, not a report) — newest first, close above morning
-  within a day, thirty at a time behind "Show more". The row's figure is
+  Dashboard lists every report the app has WRITTEN — the history endpoint
+  returns one item per `day_reports` row with `status IN ('ready','refused')` (a `pending` row is
+  a 15-minute reservation, not a report) — newest first, thirty at a time
+  behind "Show more". The row's figure is
   PERSISTED, never recomputed: `day_reports` carries three nullable columns
   (`figure_day`, `day_change_pln`, `day_change_pct`) plus `figure_partial`,
   written ONLY by `narrative-store.ts`'s `reserveNarrative` (insert and lease
@@ -1117,11 +1117,15 @@ change must work on every iPhone size the app already supports.
   scope ONLY — a per-portfolio report generated lazily from the report
   page's chips is not listed. On the phone `DayReportHistoryStore` is
   cache-first for page one (`day-report-history`, 24 h TTL), never caches
-  later pages, and dedupes on `(day, kind)`; a row is a `NavigationLink` to
-  the SAME `Route.dayReport(day:kind:)` the push deep link reaches, from the
-  Dashboard tab's own stack. A morning row's figure is the PREVIOUS session's
-  move (that is what the brief recaps) and carries a "<day> close" caption
-  saying so.
+  later pages, and dedupes on `(day, kind)`. Since 2026-10-17
+  (plans/2026-10-17-day-reports-one-row-per-day.md) the list shows ONE ROW PER
+  DAY: `DayReportHistoryDay.group` folds the loaded items (every page, via the
+  store's computed `days`) by `day`, newest first. A row has two per-half
+  `NavigationLink`s, "Open" (morning) and "Close", each present only when that
+  half exists, to the SAME `Route.dayReport(day:kind:)` the push deep link
+  reaches, from the Dashboard tab's own stack; the row body is inert. The
+  right-hand figure is the CLOSE half's only, "—" without a close; the
+  morning figure (the previous session's move) is not shown.
 
     **Browsing any ticker (2026-08-22).** The instrument screen used to answer
   only for a symbol you owned or watched (the web page has a third source —

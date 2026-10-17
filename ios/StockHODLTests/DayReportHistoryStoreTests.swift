@@ -169,4 +169,26 @@ struct DayReportHistoryStoreTests {
         #expect(cache.writes == 1)
         #expect(store.items.count == 2)
     }
+
+    @Test("a day whose halves arrive on different pages still becomes one row")
+    func daysMergeAcrossPages() async {
+        let server = FakeDayReportHistoryServer()
+        func page(_ rows: [(String, String)], _ cursor: String?) -> Data {
+            let body = rows.map { DayReportHistoryFixture.item(day: $0.0, kind: $0.1) }.joined(separator: ",")
+            let c = cursor.map { "\"\($0)\"" } ?? "null"
+            return Data("{\"items\":[\(body)],\"nextCursor\":\(c)}".utf8)
+        }
+        server.pages[FakeDayReportHistoryServer.firstPage] = page([("2026-09-18", "close"), ("2026-09-17", "close")], "2026-09-17:close")
+        server.pages["2026-09-17:close"] = page([("2026-09-17", "morning"), ("2026-09-16", "close")], nil)
+        let store = makeStore(server, cache: FakePayloadCache())
+
+        await store.load()
+        #expect(store.days.first { $0.day == "2026-09-17" }?.morning == nil)
+        await store.loadMore()
+
+        #expect(store.days.map(\.day) == ["2026-09-18", "2026-09-17", "2026-09-16"])
+        let merged = store.days.first { $0.day == "2026-09-17" }
+        #expect(merged?.morning != nil)
+        #expect(merged?.close != nil)
+    }
 }
