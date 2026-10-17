@@ -70,6 +70,79 @@ enum StreamEvent<Payload: Decodable & Sendable>: Sendable {
 /// most likely to be wrong, and it deserves a test that does not need a server.
 typealias LiveEvent = StreamEvent<LivePayload>
 
+/// A byte stream split into SSE lines, KEEPING the blank ones.
+///
+/// Exists because `URLSession.AsyncBytes.lines` silently omits empty lines
+/// (2026-09-28): every frame's terminator vanished, `SSEParser` never
+/// completed a frame, and live prices only ever moved on a REST refresh — a
+/// phone reopened often hid it; a Mac window left open showed it at once.
+/// Accepts `\n`, `\r\n` and a bare `\r`, as the SSE spec does. Generic over
+/// the byte source so a test can drive it without a server.
+struct SSELines<Base: AsyncSequence>: AsyncSequence where Base.Element == UInt8 {
+    typealias Element = String
+
+    private let base: Base
+
+    init(_ base: Base) {
+        self.base = base
+    }
+
+    struct AsyncIterator: AsyncIteratorProtocol {
+        /// A line past this is a broken stream, not a frame: our payloads are
+        /// a few kilobytes, and an unterminated line would otherwise grow the
+        /// buffer until the watchdog fires. Throwing ends the stream like any
+        /// other failure, and the pump falls back to polling.
+        static var maxLineBytes: Int { 1 << 20 }
+
+        var bytes: Base.AsyncIterator
+        private var buffer: [UInt8] = []
+        private var afterCR = false
+        private var finished = false
+
+        init(bytes: Base.AsyncIterator) {
+            self.bytes = bytes
+        }
+
+        mutating func next() async throws -> String? {
+            while !finished {
+                guard let byte = try await bytes.next() else {
+                    finished = true
+                    // A last line with no terminator still counts.
+                    return buffer.isEmpty ? nil : flush()
+                }
+                if afterCR {
+                    afterCR = false
+                    if byte == 0x0A { continue }  // the \n of a \r\n
+                }
+                switch byte {
+                case 0x0A:
+                    return flush()
+                case 0x0D:
+                    afterCR = true
+                    return flush()
+                default:
+                    guard buffer.count < Self.maxLineBytes else { throw SSELineTooLong() }
+                    buffer.append(byte)
+                }
+            }
+            return nil
+        }
+
+        private mutating func flush() -> String {
+            let line = String(decoding: buffer, as: UTF8.self)
+            buffer.removeAll(keepingCapacity: true)
+            return line
+        }
+    }
+
+    func makeAsyncIterator() -> AsyncIterator {
+        AsyncIterator(bytes: base.makeAsyncIterator())
+    }
+}
+
+/// Thrown by `SSELines` when a line passes `maxLineBytes`.
+struct SSELineTooLong: Error {}
+
 struct SSEParser<Payload: Decodable & Sendable> {
     private var event: String?
     private var data = ""
@@ -182,8 +255,12 @@ extension APIClient {
                     }
                     defer { watchdogTask.cancel() }
 
+                    // `SSELines`, never `bytes.lines`: Foundation's line
+                    // sequence drops blank lines, and the blank line is the
+                    // only thing that ends an SSE frame — through `.lines`
+                    // the stream stayed connected and delivered nothing.
                     var parser = SSEParser<Payload>()
-                    for try await line in bytes.lines {
+                    for try await line in SSELines(bytes) {
                         if Task.isCancelled { break }
                         await watchdog.touch()
                         if let event = parser.consume(line: line) {

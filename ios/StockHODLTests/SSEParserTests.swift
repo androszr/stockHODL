@@ -111,6 +111,59 @@ struct SSEParserTests {
         }
     }
 
+    /// The wire as the network hands it over: raw bytes, split by `SSELines`
+    /// — the path `APIClient.events` really takes. The helper above splits a
+    /// String itself and so could never see that `AsyncBytes.lines` threw
+    /// every blank line (every frame terminator) away (2026-09-28).
+    private func eventsFromBytes(_ wire: String) async throws -> [LiveEvent] {
+        let bytes = AsyncStream<UInt8> { continuation in
+            for byte in Array(wire.utf8) { continuation.yield(byte) }
+            continuation.finish()
+        }
+        var parser = SSEParser<LivePayload>()
+        var out: [LiveEvent] = []
+        for try await line in SSELines(bytes) {
+            if let event = parser.consume(line: line) { out.append(event) }
+        }
+        return out
+    }
+
+    @Test("frames read from raw bytes complete, blank-line terminators kept")
+    func framesFromBytes() async throws {
+        let payload = LiveFixture.payload(totalValue: "2 000,00 PLN")
+        let json = try String(data: JSONEncoder().encode(payload), encoding: .utf8) ?? ""
+
+        let out = try await eventsFromBytes(
+            ": ping\n\nevent: payload\ndata: \(json)\n\nevent: bye\ndata: {\"reason\":\"lifetime\"}\n\n"
+        )
+        #expect(out.count == 2)
+        guard case .payload(let decoded) = out.first, case .bye = out.last else {
+            Issue.record("expected payload then bye, got \(out)")
+            return
+        }
+        #expect(decoded.summary.totalValue == "2 000,00 PLN")
+    }
+
+    @Test("CRLF and bare CR line endings split the same way as LF")
+    func lineEndings() async throws {
+        let out = try await eventsFromBytes(
+            "event: bye\r\ndata: {\"reason\":\"a\"}\r\n\r\nevent: bye\rdata: {\"reason\":\"b\"}\r\r"
+        )
+        #expect(out.count == 2)
+    }
+
+    @Test("a line past the cap ends the stream instead of growing forever")
+    func overlongLineThrows() async {
+        let limit = SSELines<AsyncStream<UInt8>>.AsyncIterator.maxLineBytes
+        let bytes = AsyncStream<UInt8> { continuation in
+            for _ in 0...limit { continuation.yield(0x61) }
+            continuation.finish()
+        }
+        await #expect(throws: SSELineTooLong.self) {
+            for try await _ in SSELines(bytes) {}
+        }
+    }
+
     @Test("a frame with an event but no data produces nothing")
     func emptyData() {
         // Guards against emitting a `.bye(nil)` for a stray `event:` line,

@@ -78,6 +78,8 @@ final class LiveStore {
     /// in the shell now, above every tab, and the shell must not wake a store
     /// nobody has opened — see `SignedInView`.
     private(set) var hasStarted = false
+    /// Paces the snapshot a price tick writes. See `applyTick`.
+    private var tickSnapshots = SnapshotPacer()
 
     init(
         client: LiveClient,
@@ -296,7 +298,9 @@ final class LiveStore {
         // in, so the next cold start paints the newest prices this app ever
         // saw rather than the ones that happened to ride along with the static
         // data.
-        snapshots.write(Snapshot(bootstrap: fresh.replacingLive(freshLive), capturedAt: Date()))
+        let now = Date()
+        snapshots.write(Snapshot(bootstrap: fresh.replacingLive(freshLive), capturedAt: now))
+        tickSnapshots.wrote(at: now)
     }
 
     private func recordFailure(_ error: Error? = nil) {
@@ -334,6 +338,9 @@ final class LiveStore {
         } else {
             pump?.cancel()
             pump = nil
+            // The ticks the pacer held back since its last write: leaving the
+            // app is the moment the widgets should match what was on screen.
+            if tickSnapshots.isPending { writeTickSnapshot(at: Date()) }
         }
     }
 
@@ -466,12 +473,25 @@ final class LiveStore {
 
     /// A price tick updates the live half only. The static half is untouched —
     /// nothing about a quote changes what the user owns.
+    ///
+    /// The snapshot is paced, not written per tick: the stream sends up to one
+    /// payload a second, and every write is a main-actor encode, an app-group
+    /// file write and a widget reload (`WidgetNudgingSnapshotStore`). The
+    /// snapshot only exists so a cold start and the widgets show what the app
+    /// last showed, so once a minute plus once on leaving the app is enough.
     private func applyTick(_ payload: LivePayload) {
+        let now = Date()
         live = payload
-        stale.succeeded(at: Date())
-        if let bootstrap {
-            snapshots.write(Snapshot(bootstrap: bootstrap.replacingLive(payload), capturedAt: Date()))
+        stale.succeeded(at: now)
+        if tickSnapshots.shouldWrite(at: now) {
+            writeTickSnapshot(at: now)
         }
+    }
+
+    private func writeTickSnapshot(at now: Date) {
+        guard let bootstrap, let live else { return }
+        snapshots.write(Snapshot(bootstrap: bootstrap.replacingLive(live), capturedAt: now))
+        tickSnapshots.wrote(at: now)
     }
 
     // MARK: - Sign-out
@@ -484,6 +504,7 @@ final class LiveStore {
         pump = nil
         hasStarted = false
         snapshots.clear()
+        tickSnapshots = SnapshotPacer()
         bootstrap = nil
         live = nil
         stale.reset()
@@ -518,5 +539,30 @@ extension BootstrapResponse {
             staticHoldings: staticHoldings,
             watchlist: watchlist
         )
+    }
+}
+
+/// At most one snapshot per `interval` from price ticks, remembering whether a
+/// tick was held back so the store can flush it when the app leaves the
+/// foreground. Pure, so the pacing is pinned without a stream.
+struct SnapshotPacer {
+    static let interval: TimeInterval = 60
+
+    private var lastWrite: Date?
+    private(set) var isPending = false
+
+    /// True when a tick at `now` should be written; otherwise records that one
+    /// was held back.
+    mutating func shouldWrite(at now: Date) -> Bool {
+        if let lastWrite, now.timeIntervalSince(lastWrite) < Self.interval {
+            isPending = true
+            return false
+        }
+        return true
+    }
+
+    mutating func wrote(at now: Date) {
+        lastWrite = now
+        isPending = false
     }
 }

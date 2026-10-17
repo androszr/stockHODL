@@ -477,3 +477,28 @@ struct LiveStoreTests {
         #expect(server.liveCalls == 0)
     }
 }
+
+@Suite("Snapshot pacer")
+struct SnapshotPacerTests {
+    @Test("the first tick writes; ticks inside the interval are held and flagged")
+    func pacesTicks() {
+        var pacer = SnapshotPacer()
+        let start = Date(timeIntervalSince1970: 1_000_000)
+
+        let first = pacer.shouldWrite(at: start)
+        #expect(first)
+        pacer.wrote(at: start)
+        #expect(!pacer.isPending)
+
+        let oneSecondLater = pacer.shouldWrite(at: start.addingTimeInterval(1))
+        let justInside = pacer.shouldWrite(at: start.addingTimeInterval(59))
+        #expect(!oneSecondLater)
+        #expect(!justInside)
+        #expect(pacer.isPending)
+
+        let atInterval = pacer.shouldWrite(at: start.addingTimeInterval(SnapshotPacer.interval))
+        #expect(atInterval)
+        pacer.wrote(at: start.addingTimeInterval(SnapshotPacer.interval))
+        #expect(!pacer.isPending)
+    }
+}
