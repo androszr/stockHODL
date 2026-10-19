@@ -16,7 +16,7 @@ import {
 } from '@/lib/history/portfolio-series';
 import { nyDateISOAt } from '@/lib/market-data/market-clock';
 import { massiveProvider } from '@/lib/market-data/massive';
-import { dec, toNumeric } from '@/lib/money';
+import { dec, pctChange, toNumeric } from '@/lib/money';
 import { resolveOptionPrints } from '@/lib/options/fresh-print';
 import { loadOptionsInputs } from '@/lib/options/live-view';
 import { markOptionQuotes } from '@/lib/options/option-mark';
@@ -29,6 +29,7 @@ import {
 
 import {
   downsampleDayLine,
+  endOnLivePercent,
   fittedCap,
   lastRegularSession,
   sessionBounds,
@@ -46,21 +47,12 @@ import {
 /** Same pool width as `portfolio-series.ts` — never export theirs. */
 const HISTORY_CONCURRENCY = 5;
 
-/** Hold the last percent out to `endMs` so a closed day is full width. */
-function carryLastPercentTo(
-  points: readonly WidgetDayPoint[],
-  endMs: number,
-): WidgetDayPoint[] {
-  const last = points[points.length - 1];
-  if (!last || endMs <= last.t) return [...points];
-  return [...points, { t: endMs, p: last.p }];
-}
-
-function previousClosePLN(
+/** Previous-close baseline and the live percent the headline reads. */
+function holdingsDayBasis(
   txs: readonly EngineTransaction[],
   quotes: ReadonlyMap<string, HoldingQuote>,
   fxRates: ReadonlyMap<string, string>,
-): string | null {
+): { baseline: string; livePct: string | null } | null {
   const positions = displayablePositions(computePositions([...txs], quotes, fxRates));
   const summaryQuotes = new Map(
     [...quotes].map(([symbol, quote]) => [
@@ -72,7 +64,11 @@ function previousClosePLN(
   if (summary.totalValuePLN === null || summary.dayChangePLN === null) return null;
   const baseline = summary.totalValuePLN.minus(summary.dayChangePLN);
   if (baseline.isZero()) return null;
-  return toNumeric(baseline);
+  const livePct = pctChange(baseline, summary.totalValuePLN);
+  return {
+    baseline: toNumeric(baseline),
+    livePct: livePct === null ? null : toNumeric(livePct),
+  };
 }
 
 async function holdingsDayLine(
@@ -95,19 +91,23 @@ async function holdingsDayLine(
     if (!shouldShipWidgetDayLines(loaded.inputs.market.status, session, Date.now())) {
       return { points: [], session: null };
     }
-    const baseline = previousClosePLN(
+    const basis = holdingsDayBasis(
       loaded.inputs.engineTxs,
       loaded.quotes,
       loaded.inputs.fxRates,
     );
-    if (baseline === null) return { points: [], session };
+    if (basis === null) return { points: [], session };
     const endMs =
       loaded.inputs.market.status === 'open'
         ? Math.min(Date.now(), session.closeMs)
         : session.closeMs;
     return {
       points: downsampleDayLine(
-        carryLastPercentTo(toSessionPercentSeries(last, baseline), endMs),
+        endOnLivePercent(
+          toSessionPercentSeries(last, basis.baseline),
+          endMs,
+          basis.livePct,
+        ),
       ),
       session,
     };
@@ -145,8 +145,10 @@ async function optionsDayLine(
       loaded.recentMarks,
     );
     const seedByTicker = new Map<string, string>();
+    const liveByTicker = new Map<string, string>();
     for (const ticker of tickers) {
       const print = prints.get(ticker);
+      if (print?.price) liveByTicker.set(ticker, print.price);
       if (print?.dayBasisBaseMark) {
         seedByTicker.set(ticker, print.dayBasisBaseMark);
       } else if (print?.price && print.day) {
@@ -216,6 +218,7 @@ async function optionsDayLine(
         seedByTicker,
         bounds,
         carryToMs,
+        liveByTicker,
       ),
       session: bounds,
     };

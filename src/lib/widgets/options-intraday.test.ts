@@ -114,6 +114,42 @@ describe('optionsSessionPercentSeries', () => {
     );
     expect(series).toEqual([]);
   });
+
+  it('ends on the live book, not the last traded bar, so it agrees with the headline', () => {
+    // Last trade at 2_000 is UP (+10%); the live mark has since fallen below
+    // the previous close (-0.25%). The tip must say what the headline says.
+    const series = optionsSessionPercentSeries(
+      [{ ticker: 'O:AAPL', quantity: '1', sharesPerContract: '100' }],
+      new Map([['O:AAPL', [{ t: 2_000, close: '4.4' }]]]),
+      new Map([['O:AAPL', '4']]),
+      SESSION,
+      6_000,
+      new Map([['O:AAPL', '3.99']]),
+    );
+    const tip = series[series.length - 1];
+    expect(tip.t).toBe(6_000);
+    expect(dec(tip.p).equals(dec('-0.25'))).toBe(true);
+  });
+
+  it('keeps the plain carry when a seeded ticker has no live price', () => {
+    const series = optionsSessionPercentSeries(
+      [
+        { ticker: 'O:AAPL', quantity: '1', sharesPerContract: '100' },
+        { ticker: 'O:MSFT', quantity: '1', sharesPerContract: '100' },
+      ],
+      new Map([['O:AAPL', [{ t: 2_000, close: '4.4' }]]]),
+      new Map([
+        ['O:AAPL', '4'],
+        ['O:MSFT', '4'],
+      ]),
+      SESSION,
+      6_000,
+      new Map([['O:AAPL', '3.99']]),
+    );
+    const tip = series[series.length - 1];
+    expect(tip.t).toBe(6_000);
+    expect(dec(tip.p).equals(dec('5'))).toBe(true);
+  });
 });
 
 describe('money discipline', () => {

@@ -7,6 +7,7 @@ import { dec } from '@/lib/money';
 
 import {
   downsampleDayLine,
+  endOnLivePercent,
   fittedCap,
   lastRegularSession,
   regularSessionPoints,
@@ -14,6 +15,32 @@ import {
   toSessionPercentSeries,
   WIDGET_DAY_LINE_MAX_POINTS,
 } from './day-line';
+
+describe('endOnLivePercent', () => {
+  const bars = [
+    { t: 1_000, p: '0' },
+    { t: 2_000, p: '0.4' },
+  ];
+
+  it('appends the live percent at endMs instead of carrying the last bar', () => {
+    expect(endOnLivePercent(bars, 5_000, '-0.25')).toEqual([...bars, { t: 5_000, p: '-0.25' }]);
+  });
+
+  it('replaces the last bar when it already sits at endMs', () => {
+    expect(endOnLivePercent(bars, 2_000, '-0.25')).toEqual([
+      { t: 1_000, p: '0' },
+      { t: 2_000, p: '-0.25' },
+    ]);
+  });
+
+  it('carries the last bar when there is no live percent', () => {
+    expect(endOnLivePercent(bars, 5_000, null)).toEqual([...bars, { t: 5_000, p: '0.4' }]);
+  });
+
+  it('draws nothing from a live tip alone', () => {
+    expect(endOnLivePercent([], 5_000, '-0.25')).toEqual([]);
+  });
+});
 
 describe('regularSessionPoints', () => {
   it('drops pre and post bars and keeps untagged regular ones', () => {

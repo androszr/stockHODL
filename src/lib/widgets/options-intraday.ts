@@ -1,8 +1,9 @@
 import type { ChartPoint } from '@/lib/charts/series';
-import { dec, toNumeric, ZERO } from '@/lib/money';
+import { dec, pctChange, toNumeric, ZERO } from '@/lib/money';
 
 import {
   downsampleDayLine,
+  endOnLivePercent,
   toSessionPercentSeries,
   type SessionBounds,
   type WidgetDayPoint,
@@ -98,13 +99,20 @@ export function optionsSessionValuePoints(
   return points;
 }
 
-/** Percent series vs the previous-close book, downsampled. */
+/**
+ * Percent series vs the previous-close book, downsampled. With `liveByTicker`
+ * (the live price per ticker the headline reads), the path ends on the live
+ * book at `carryToMs` rather than on the last traded bar — see
+ * `endOnLivePercent`. A seeded ticker missing a live price leaves the plain
+ * carry: a part-live book is not the headline's book.
+ */
 export function optionsSessionPercentSeries(
   lots: readonly OptionIntradayLot[],
   printsByTicker: ReadonlyMap<string, readonly OptionPrint[]>,
   seedByTicker: ReadonlyMap<string, string>,
   session: SessionBounds,
   carryToMs?: number,
+  liveByTicker?: ReadonlyMap<string, string>,
 ): WidgetDayPoint[] {
   const valuePoints = optionsSessionValuePoints(
     lots,
@@ -118,5 +126,15 @@ export function optionsSessionPercentSeries(
     seedByTicker,
   );
   if (baseline === null) return [];
-  return downsampleDayLine(toSessionPercentSeries(valuePoints, baseline));
+  const series = toSessionPercentSeries(valuePoints, baseline);
+  if (liveByTicker === undefined) return downsampleDayLine(series);
+
+  const seededLots = lots.filter((lot) => seedByTicker.has(lot.ticker));
+  const allLive = seededLots.every((lot) => liveByTicker.has(lot.ticker));
+  const liveBook = allLive ? bookValueAt(seededLots, liveByTicker) : null;
+  const livePct = liveBook === null ? null : pctChange(dec(baseline), dec(liveBook));
+  const end = carryToMs === undefined ? session.closeMs : carryToMs;
+  return downsampleDayLine(
+    endOnLivePercent(series, end, livePct === null ? null : toNumeric(livePct)),
+  );
 }

@@ -68,6 +68,28 @@ export function toSessionPercentSeries(
   return out;
 }
 
+/**
+ * End the path at `endMs` on the LIVE percent — the same quote/mark the
+ * headline figure reads — instead of carrying the last minute bar forward.
+ * Bars are last-trade closes and lag (a thin option may not have traded for
+ * an hour), so a carried bar can sit on the other side of zero from the
+ * headline: a green line under a red `-0.25%`. A null `livePct` keeps the
+ * plain carry. No bars → no path (a live tip alone is not a session path).
+ */
+export function endOnLivePercent(
+  points: readonly WidgetDayPoint[],
+  endMs: number,
+  livePct: string | null,
+): WidgetDayPoint[] {
+  const last = points[points.length - 1];
+  if (!last) return [];
+  const tipP = livePct ?? last.p;
+  if (endMs <= last.t) {
+    return [...points.slice(0, -1), { t: last.t, p: tipP }];
+  }
+  return [...points, { t: endMs, p: tipP }];
+}
+
 /** Keep first + last, never rewrite a value. */
 export function downsampleDayLine(points: readonly WidgetDayPoint[]): WidgetDayPoint[] {
   const asChart: ChartPoint[] = points.map((point) => ({ t: point.t, v: point.p }));
