@@ -20,11 +20,19 @@ import UserNotifications
 /// device token is registered while ANY switch is on and DELETEd only when
 /// BOTH are off — one switch is a preference, the registration is the shared
 /// plumbing underneath both.
+///
+/// A third switch rides the same server row but is NOT a notification: "Daily
+/// reports" decides whether the server writes the morning and close reports
+/// at all (off = paused). It never asks the OS for anything and never touches
+/// the device registration, so an OS-level denial does not lock it.
 @MainActor
 @Observable
 final class NotificationsStore {
     private(set) var priceAlertsEnabled: Bool
     private(set) var dailySummaryEnabled: Bool
+    /// Whether the server writes the morning and close day reports. Off means
+    /// paused: no report is written and no push is sent for one.
+    private(set) var dayReportsEnabled: Bool
     /// True while `load()` is on the wire — the toggles are disabled then.
     private(set) var isLoading = false
     /// True once the SERVER has answered. Until then the booleans are the
@@ -50,6 +58,7 @@ final class NotificationsStore {
     /// answers what the device already believed.
     private static let priceAlertsKey = "pushAlertsEnabled"
     private static let dailySummaryKey = "pushDailySummaryEnabled"
+    private static let dayReportsKey = "dayReportsEnabled"
     /// NOT a cache: the only handle for unregistering the device. Dropping it
     /// would orphan a server row that keeps pushing to a signed-out device.
     private static let registeredTokenKey = "pushAlertsDeviceToken"
@@ -70,6 +79,7 @@ final class NotificationsStore {
         self.center = center
         priceAlertsEnabled = defaults.bool(forKey: Self.priceAlertsKey)
         dailySummaryEnabled = defaults.bool(forKey: Self.dailySummaryKey)
+        dayReportsEnabled = defaults.bool(forKey: Self.dayReportsKey)
     }
 
     func refreshAuthorizationStatus() async {
@@ -90,6 +100,10 @@ final class NotificationsStore {
             let preferences = try await client.preferences(bearerToken: bearer)
             priceAlertsEnabled = preferences.priceAlerts
             dailySummaryEnabled = preferences.dailySummary
+            // Absent only from a server older than the switch, where nothing
+            // could pause the reports — but the switch could not be honoured
+            // either, so it paints off rather than claiming a state.
+            dayReportsEnabled = preferences.dayReports ?? false
             cacheDisplayState()
             hasLoaded = true
         } catch {
@@ -105,6 +119,34 @@ final class NotificationsStore {
 
     func setDailySummary(_ enabled: Bool) async {
         await apply(priceAlerts: priceAlertsEnabled, dailySummary: enabled)
+    }
+
+    /// Pauses or resumes the server's morning and close reports. Deliberately
+    /// NOT routed through `apply`: this is not a notification, so it must not
+    /// prompt for OS permission or register / unregister the device token.
+    func setDayReports(_ enabled: Bool) async {
+        errorMessage = nil
+        guard let bearer = tokenProvider() else { return }
+        isBusy = true
+        defer { isBusy = false }
+
+        do {
+            try await client.updatePreferences(
+                NotificationPreferences(
+                    dailySummary: dailySummaryEnabled,
+                    dayReports: enabled,
+                    priceAlerts: priceAlertsEnabled
+                ),
+                bearerToken: bearer
+            )
+        } catch {
+            // The server row did not change, so neither may the view.
+            errorMessage = "Could not save the daily reports setting."
+            return
+        }
+
+        dayReportsEnabled = enabled
+        cacheDisplayState()
     }
 
     private func apply(priceAlerts: Bool, dailySummary: Bool) async {
@@ -133,7 +175,11 @@ final class NotificationsStore {
         guard let bearer = tokenProvider() else { return }
         do {
             try await client.updatePreferences(
-                NotificationPreferences(dailySummary: dailySummary, priceAlerts: priceAlerts),
+                NotificationPreferences(
+                    dailySummary: dailySummary,
+                    dayReports: dayReportsEnabled,
+                    priceAlerts: priceAlerts
+                ),
                 bearerToken: bearer
             )
         } catch {
@@ -197,6 +243,7 @@ final class NotificationsStore {
     private func cacheDisplayState() {
         defaults.set(priceAlertsEnabled, forKey: Self.priceAlertsKey)
         defaults.set(dailySummaryEnabled, forKey: Self.dailySummaryKey)
+        defaults.set(dayReportsEnabled, forKey: Self.dayReportsKey)
     }
 
     /// Clears the local record ONLY when the server actually dropped the row.

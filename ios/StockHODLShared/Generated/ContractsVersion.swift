@@ -7,5 +7,5 @@
 //
 
 enum ContractsVersion {
-    static let current = "d5832eb07d6e"
+    static let current = "377b00745628"
 }

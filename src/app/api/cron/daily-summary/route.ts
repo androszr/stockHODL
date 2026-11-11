@@ -36,6 +36,9 @@ import { pruneInvalidTokens } from '@/lib/push/tokens';
  * the run would build the close figure — and write the close report, which
  * is never regenerated — from 15-minute-delayed quotes ending at 15:45 EST.
  *
+ * An account whose "Daily reports" switch is off is PAUSED: skipped before
+ * anything is written or sent, and counted in `paused`.
+ *
  * Honesty over completeness, three times:
  *
  *  - the push waits for the report it deep-links to. A run whose close
@@ -74,13 +77,20 @@ export async function GET(request: Request) {
     let sent = 0;
     let reports = 0;
     let notReady = 0;
+    let paused = 0;
     const invalidTokens = new Set<string>();
 
     // Best-effort per user, like check-price-alerts: one user's failure never
-    // blocks the next user's summary. Every account is walked — the close
-    // report is written whether or not the push switch is on; the switch only
-    // decides the push below.
+    // blocks the next user's summary. Every account whose "Daily reports"
+    // switch is on is walked — the close report is written whether or not the
+    // push switch is on; that one only decides the push below.
     for (const user of await listDayReportUsers()) {
+      // The "Daily reports" switch is off: nothing is written and nothing is
+      // pushed for this account — the report is what the push opens.
+      if (!user.dayReports) {
+        paused++;
+        continue;
+      }
       try {
         const narrative = await ensureDayReportNarrative(user.userId, dayISO, null, 'close').catch(
           (error) => {
@@ -141,7 +151,7 @@ export async function GET(request: Request) {
 
     if (invalidTokens.size > 0) await pruneInvalidTokens([...invalidTokens]);
 
-    return Response.json({ ok: true, day: dayISO, reports, sent, notReady }, { headers: NO_STORE });
+    return Response.json({ ok: true, day: dayISO, reports, sent, notReady, paused }, { headers: NO_STORE });
   } catch (error) {
     console.error('[cron/daily-summary]', error);
     return Response.json({ error: 'Summary failed.' }, { status: 502, headers: NO_STORE });

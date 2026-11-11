@@ -8,7 +8,7 @@ import { db, notificationPreferences, user } from '@/lib/db';
  * The `server-only` owner of the `notification_preferences` table
  * (plans/2026-09-05-daily-portfolio-summary-push.md).
  *
- * A missing row means both preferences are OFF — uniformly, with no
+ * A missing row means every preference is OFF — uniformly, with no
  * token-exists fallback: the backfill migration inserted `price_alerts = true`
  * for every user already holding a push token, so that special case never
  * needs to exist. Booleans and a calendar date only; no money columns.
@@ -17,9 +17,19 @@ import { db, notificationPreferences, user } from '@/lib/db';
 export interface NotificationPreferencesRow {
   priceAlerts: boolean;
   dailySummary: boolean;
+  /** Whether the day-report crons write anything for this account. */
+  dayReports: boolean;
 }
 
-/** The two switches, as the account remembers them. Missing row → both false. */
+/**
+ * What a `PUT` carries: `dayReports` may be absent (a build older than the
+ * switch), and absent means "leave it as it is".
+ */
+export type NotificationPreferencesWrite = Omit<NotificationPreferencesRow, 'dayReports'> & {
+  dayReports?: boolean;
+};
+
+/** The switches, as the account remembers them. Missing row → all false. */
 export async function getNotificationPreferences(
   userId: string,
 ): Promise<NotificationPreferencesRow> {
@@ -27,26 +37,36 @@ export async function getNotificationPreferences(
     .select({
       priceAlerts: notificationPreferences.priceAlerts,
       dailySummary: notificationPreferences.dailySummary,
+      dayReports: notificationPreferences.dayReports,
     })
     .from(notificationPreferences)
     .where(eq(notificationPreferences.userId, userId));
 
-  return rows[0] ?? { priceAlerts: false, dailySummary: false };
+  return rows[0] ?? { priceAlerts: false, dailySummary: false, dayReports: false };
 }
 
 /** Upsert on `userId` — the PUT handler's whole body. */
 export async function setNotificationPreferences(
   userId: string,
-  prefs: NotificationPreferencesRow,
+  prefs: NotificationPreferencesWrite,
 ): Promise<void> {
+  // Absent `dayReports` is omitted from both halves: the insert falls back to
+  // the column default (off) and the update leaves the stored value alone.
+  const dayReports = prefs.dayReports === undefined ? {} : { dayReports: prefs.dayReports };
   await db
     .insert(notificationPreferences)
-    .values({ userId, priceAlerts: prefs.priceAlerts, dailySummary: prefs.dailySummary })
+    .values({
+      userId,
+      priceAlerts: prefs.priceAlerts,
+      dailySummary: prefs.dailySummary,
+      ...dayReports,
+    })
     .onConflictDoUpdate({
       target: notificationPreferences.userId,
       set: {
         priceAlerts: prefs.priceAlerts,
         dailySummary: prefs.dailySummary,
+        ...dayReports,
         updatedAt: new Date(),
       },
     });
@@ -54,6 +74,11 @@ export async function setNotificationPreferences(
 
 export interface DayReportUser {
   userId: string;
+  /**
+   * The "Daily reports" switch. Off = paused: the crons skip the account
+   * entirely — no report written, no push sent.
+   */
+  dayReports: boolean;
   /** The "Daily summary" switch — governs BOTH pushes, never the reports. */
   dailySummary: boolean;
   /** NY-calendar ISO date of the last DELIVERED summary, or null. */
@@ -68,11 +93,15 @@ export interface DayReportUser {
  * the Dashboard history read the same row. Gating the walk on the switch
  * (the original shape) meant a user with pushes off never got a morning
  * report generated at all. A missing preferences row means the switch is off.
+ *
+ * Paused accounts (`dayReports` false, the default) are still LISTED — the
+ * crons skip them and count them, so a run's JSON says why it wrote nothing.
  */
 export async function listDayReportUsers(): Promise<DayReportUser[]> {
   const rows = await db
     .select({
       userId: user.id,
+      dayReports: notificationPreferences.dayReports,
       dailySummary: notificationPreferences.dailySummary,
       dailySummaryLastSentDay: notificationPreferences.dailySummaryLastSentDay,
       morningBriefLastSentDay: notificationPreferences.morningBriefLastSentDay,
@@ -81,6 +110,7 @@ export async function listDayReportUsers(): Promise<DayReportUser[]> {
     .leftJoin(notificationPreferences, eq(notificationPreferences.userId, user.id));
   return rows.map((row) => ({
     userId: row.userId,
+    dayReports: row.dayReports ?? false,
     dailySummary: row.dailySummary ?? false,
     dailySummaryLastSentDay: row.dailySummaryLastSentDay,
     morningBriefLastSentDay: row.morningBriefLastSentDay,

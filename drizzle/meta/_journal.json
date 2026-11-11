@@ -169,6 +169,13 @@
       "when": 1790000840633,
       "tag": "0023_silly_shadowcat",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1794440686217,
+      "tag": "0024_tricky_harpoon",
+      "breakpoints": true
     }
   ]
 }

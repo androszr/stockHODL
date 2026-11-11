@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const h = vi.hoisted(() => ({
   users: [] as Array<{
     userId: string;
+    dayReports: boolean;
     dailySummary: boolean;
     dailySummaryLastSentDay: string | null;
     morningBriefLastSentDay: string | null;
@@ -72,7 +73,7 @@ const request = () =>
   });
 
 const switchOn = () => [
-  { userId: 'u1', dailySummary: true, dailySummaryLastSentDay: null, morningBriefLastSentDay: null },
+  { userId: 'u1', dayReports: true, dailySummary: true, dailySummaryLastSentDay: null, morningBriefLastSentDay: null },
 ];
 
 let warnSpy: ReturnType<typeof vi.spyOn>;
@@ -96,7 +97,7 @@ describe('daily-summary cron', () => {
     expect(h.sendPush).toHaveBeenCalledTimes(1);
     expect(h.sendPush.mock.calls[0][1]).toMatchObject({ title: 'Portfolio today' });
     expect(h.markSent).toHaveBeenCalledWith('u1', DAY);
-    expect(body).toEqual({ ok: true, day: DAY, reports: 1, sent: 1, notReady: 0 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 1, sent: 1, notReady: 0, paused: 0 });
   });
 
   it('a refused report is complete: sends and marks', async () => {
@@ -107,7 +108,7 @@ describe('daily-summary cron', () => {
 
     expect(h.sendPush).toHaveBeenCalledTimes(1);
     expect(h.markSent).toHaveBeenCalledWith('u1', DAY);
-    expect(body).toEqual({ ok: true, day: DAY, reports: 1, sent: 1, notReady: 0 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 1, sent: 1, notReady: 0, paused: 0 });
   });
 
   it('a pending report holds the push: no send, no marker', async () => {
@@ -119,7 +120,7 @@ describe('daily-summary cron', () => {
     expect(h.sendPush).not.toHaveBeenCalled();
     expect(h.markSent).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('held u1'));
-    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 1 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 1, paused: 0 });
   });
 
   it('an unavailable report holds the push', async () => {
@@ -131,7 +132,7 @@ describe('daily-summary cron', () => {
     expect(h.sendPush).not.toHaveBeenCalled();
     expect(h.markSent).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('held u1'));
-    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 1 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 1, paused: 0 });
   });
 
   it('a not_configured report (no writer key) does not hold: sends and marks', async () => {
@@ -143,7 +144,7 @@ describe('daily-summary cron', () => {
     expect(h.sendPush).toHaveBeenCalledTimes(1);
     expect(h.markSent).toHaveBeenCalledWith('u1', DAY);
     expect(warnSpy).not.toHaveBeenCalled();
-    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 1, notReady: 0 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 1, notReady: 0, paused: 0 });
   });
 
   it('a failed narrative write holds the push', async () => {
@@ -156,13 +157,13 @@ describe('daily-summary cron', () => {
     expect(h.sendPush).not.toHaveBeenCalled();
     expect(h.markSent).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('held u1'));
-    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 1 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 1, paused: 0 });
     errorSpy.mockRestore();
   });
 
   it('a pending report for an account with the switch OFF counts as nothing held', async () => {
     h.users = [
-      { userId: 'u1', dailySummary: false, dailySummaryLastSentDay: null, morningBriefLastSentDay: null },
+      { userId: 'u1', dayReports: true, dailySummary: false, dailySummaryLastSentDay: null, morningBriefLastSentDay: null },
     ];
     h.ensureNarrative.mockResolvedValue({ status: 'pending' });
 
@@ -171,12 +172,12 @@ describe('daily-summary cron', () => {
     expect(h.ensureNarrative).toHaveBeenCalledWith('u1', DAY, null, 'close');
     expect(h.sendPush).not.toHaveBeenCalled();
     expect(h.markSent).not.toHaveBeenCalled();
-    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 0 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 0, sent: 0, notReady: 0, paused: 0 });
   });
 
   it('a ready report already pushed today sends nothing more', async () => {
     h.users = [
-      { userId: 'u1', dailySummary: true, dailySummaryLastSentDay: DAY, morningBriefLastSentDay: null },
+      { userId: 'u1', dayReports: true, dailySummary: true, dailySummaryLastSentDay: DAY, morningBriefLastSentDay: null },
     ];
 
     const body = await (await GET(request())).json();
@@ -184,6 +185,32 @@ describe('daily-summary cron', () => {
     expect(h.ensureNarrative).toHaveBeenCalledTimes(1);
     expect(h.sendPush).not.toHaveBeenCalled();
     expect(h.markSent).not.toHaveBeenCalled();
-    expect(body).toEqual({ ok: true, day: DAY, reports: 1, sent: 0, notReady: 0 });
+    expect(body).toEqual({ ok: true, day: DAY, reports: 1, sent: 0, notReady: 0, paused: 0 });
+  });
+
+  it('a PAUSED account (Daily reports off) gets no report and no push, even with the push switch on', async () => {
+    h.users = [
+      { userId: 'u1', dayReports: false, dailySummary: true, dailySummaryLastSentDay: null, morningBriefLastSentDay: null },
+    ];
+
+    const body = await (await GET(request())).json();
+
+    expect(h.ensureNarrative).not.toHaveBeenCalled();
+    expect(h.sendPush).not.toHaveBeenCalled();
+    expect(h.markSent).not.toHaveBeenCalled();
+    expect(body).toEqual({ ok: true, day: '2026-09-21', reports: 0, sent: 0, notReady: 0, paused: 1 });
+  });
+
+  it('a paused account never blocks the next one', async () => {
+    h.users = [
+      { userId: 'u1', dayReports: false, dailySummary: true, dailySummaryLastSentDay: null, morningBriefLastSentDay: null },
+      { userId: 'u2', dayReports: true, dailySummary: false, dailySummaryLastSentDay: null, morningBriefLastSentDay: null },
+    ];
+
+    const body = await (await GET(request())).json();
+
+    expect(h.ensureNarrative).toHaveBeenCalledTimes(1);
+    expect(h.ensureNarrative).toHaveBeenCalledWith('u2', '2026-09-21', null, 'close');
+    expect(body).toEqual({ ok: true, day: '2026-09-21', reports: 1, sent: 0, notReady: 0, paused: 1 });
   });
 });

@@ -966,8 +966,10 @@ change must work on every iPhone size the app already supports.
 
   **Notification preferences + the daily summary (2026-09-05,
   plans/2026-09-05-daily-portfolio-summary-push.md).** The Settings screen
-  has TWO switches — "Price alerts" and the evening "Daily summary" — and
-  both are server-stored facts in `notification_preferences`
+  has TWO notification switches — "Price alerts" and the evening "Daily
+  summary" (labelled "Report notifications") — plus the "Daily reports"
+  pause described under § Day report, and
+  all are server-stored facts in `notification_preferences`
   (`src/lib/push/preferences.ts`, the table's only owner), read and written
   through `GET`/`PUT /api/mobile/v1/notification-preferences` (deliberately
   NOT a field on `/settings`, whose handler pays for an uncached vendor
@@ -1054,7 +1056,21 @@ change must work on every iPhone size the app already supports.
   write that half's report row first; the one daily-report preference
   governs only whether a push follows. The walk used to be gated on the
   switch, which meant an account with pushes off got no morning report at
-  all (fixed 2026-09-21). Same day, two more: the narrative reservation in
+  all (fixed 2026-09-21). **Pause switch (2026-11-12).** A third
+  server-stored preference, `notification_preferences.day_reports`
+  (migration 0024, additive, default `false`), is the Settings "Daily
+  reports" toggle: while it is off both crons skip the account BEFORE
+  anything is written or sent and count it in `paused` in their JSON — no
+  writer call, no report row, no push. It is not a notification: the phone's
+  `NotificationsStore.setDayReports` never asks the OS for permission and
+  never touches the device-token registration, and the row is not locked by
+  an OS notification denial. The push switch ("Report notifications") keeps
+  its stored value and is disabled while reports are paused. `dayReports` is
+  optional on `PUT /notification-preferences` so a build older than the
+  switch leaves it untouched; `GET` always answers it. The pause covers the
+  SCHEDULED reports only — opening today's Day report by hand still writes
+  one on demand through `POST /day-report/narrative`. A missing preferences
+  row means paused, like every other switch on that table. Same day, two more: the narrative reservation in
   `narrative-store.ts` now stamps its own millisecond `createdAt` — the
   `defaultNow()` value came back through `.returning()` truncated from
   microseconds, so complete/release (which match on `createdAt` equality)

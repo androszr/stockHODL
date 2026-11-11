@@ -1,0 +1,1 @@
+ALTER TABLE "notification_preferences" ADD COLUMN "day_reports" boolean DEFAULT false NOT NULL;

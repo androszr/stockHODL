@@ -19,6 +19,7 @@ struct SettingsView: View {
     var body: some View {
         List {
             if let notifications {
+                dayReportsSection(notifications)
                 notificationsSection(notifications)
             }
 
@@ -98,6 +99,39 @@ struct SettingsView: View {
         }
     }
 
+    /// The pause switch for the server's two daily reports — the pre-open
+    /// morning brief and the after-close report. Off means nothing is written
+    /// and nothing is pushed for them; reports already written stay readable.
+    /// Not a notification, so an OS-level notification denial does not lock
+    /// it — only an unanswered server does.
+    @ViewBuilder
+    private func dayReportsSection(_ notifications: NotificationsStore) -> some View {
+        Section {
+            Toggle(
+                "Daily reports",
+                isOn: Binding(
+                    get: { notifications.dayReportsEnabled },
+                    set: { newValue in Task { await notifications.setDayReports(newValue) } }
+                )
+            )
+            .disabled(SettingsView.dayReportsLocked(notifications))
+        } footer: {
+            Text(SettingsView.dayReportsFooter(enabled: notifications.dayReportsEnabled))
+        }
+    }
+
+    /// Locked while the server has not answered or a save is on the wire —
+    /// and NOT by `isDeniedByOS`, which is about pushes only.
+    static func dayReportsLocked(_ notifications: NotificationsStore) -> Bool {
+        notifications.isBusy || notifications.isLoading || !notifications.hasLoaded
+    }
+
+    static func dayReportsFooter(enabled: Bool) -> String {
+        enabled
+            ? "A morning brief before the US open and a report after the close are written every trading day."
+            : "Paused: no morning brief or close report is written, and no notification is sent for them. Earlier reports stay on the Dashboard."
+    }
+
     /// The two notification switches, independent server-stored preferences
     /// behind one device registration: price alerts — 5% or more within 12
     /// hours, up or down, for anything held or watched
@@ -122,18 +156,20 @@ struct SettingsView: View {
             )
             .disabled(locked)
             Toggle(
-                "Daily reports (morning + close)",
+                "Report notifications (morning + close)",
                 isOn: Binding(
                     get: { notifications.dailySummaryEnabled },
                     set: { newValue in Task { await notifications.setDailySummary(newValue) } }
                 )
             )
-            .disabled(locked)
+            // A paused report has nothing to announce: the switch keeps its
+            // stored value, and is not offered while it could do nothing.
+            .disabled(locked || !notifications.dayReportsEnabled)
         } footer: {
             if notifications.isDeniedByOS {
                 Text("Notifications are turned off for StockHODL in iOS Settings. Enable them there first.")
             } else {
-                Text("Price alerts: a push when a stock you hold or watch moves 5% or more within 12 hours. Daily reports: a brief about an hour before the US open and a report after the close, each opening that day's Day report.")
+                Text("Price alerts: a push when a stock you hold or watch moves 5% or more within 12 hours. Report notifications: a push about an hour before the US open and one after the close, each opening that day's Day report — only while Daily reports are on.")
             }
         }
         .alert(

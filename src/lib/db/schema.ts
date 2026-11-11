@@ -381,6 +381,12 @@ export const notificationPreferences = pgTable('notification_preferences', {
   dailySummary: boolean('daily_summary').notNull().default(false),
   dailySummaryLastSentDay: date('daily_summary_last_sent_day'),
   morningBriefLastSentDay: date('morning_brief_last_sent_day'),
+  /**
+   * The "Daily reports" switch: whether the two day-report crons write (and
+   * push) anything for this account. Off by default — a paused account costs
+   * no writer call. Distinct from `dailySummary`, which only decides the push.
+   */
+  dayReports: boolean('day_reports').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

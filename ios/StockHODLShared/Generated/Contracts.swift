@@ -1639,10 +1639,12 @@ struct NewsItem: Codable, Sendable {
 // MARK: - NotificationPreferences
 struct NotificationPreferences: Codable, Sendable {
     let dailySummary: Bool
+    let dayReports: Bool?
     let priceAlerts: Bool
 
     enum CodingKeys: String, CodingKey {
         case dailySummary = "dailySummary"
+        case dayReports = "dayReports"
         case priceAlerts = "priceAlerts"
     }
 }

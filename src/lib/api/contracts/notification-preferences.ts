@@ -17,6 +17,13 @@ import { z } from 'zod';
 export const notificationPreferencesSchema = z.object({
   priceAlerts: z.boolean(),
   dailySummary: z.boolean(),
+  /**
+   * Whether the morning and close day reports are written at all (off =
+   * paused: no report, no push for it). `GET` always answers it. Optional on
+   * `PUT` only so a build from before the switch existed, which sends the two
+   * push booleans alone, leaves it as it was instead of failing or resetting.
+   */
+  dayReports: z.boolean().optional(),
 });
 
 export type NotificationPreferences = z.output<typeof notificationPreferencesSchema>;

@@ -14,8 +14,9 @@ import { listDayReportUsers, markMorningBriefSent } from '@/lib/push/preferences
 import { pruneInvalidTokens } from '@/lib/push/tokens';
 
 /**
- * The pre-open Morning brief push: writes every account's morning report,
- * then pushes it to opted-in users. Vercel Cron target (`vercel.json`,
+ * The pre-open Morning brief push: writes the morning report of every account
+ * whose "Daily reports" switch is on (off = paused, skipped and counted in
+ * `paused`), then pushes it to opted-in users. Vercel Cron target (`vercel.json`,
  * weekdays at 12:30, 12:45, 13:00 and 13:15 UTC — all before the 13:30 UTC
  * summer open, because `morningBriefDayToSend` answers only while
  * `now < open`; in winter the open is 14:30 UTC and every slot qualifies).
@@ -45,12 +46,20 @@ export async function GET(request: Request) {
     let sent = 0;
     let reports = 0;
     let notReady = 0;
+    let paused = 0;
     const invalidTokens = new Set<string>();
-    // Every account, not just the opted-in ones: the report is written first
+    // Every account with "Daily reports" on, not just the push-opted-in ones:
+    // the report is written first
     // and unconditionally, the push is the optional second half. Gating the
     // whole loop on the switch left an account with pushes off without any
     // morning report at all.
     for (const user of await listDayReportUsers()) {
+      // The "Daily reports" switch is off: nothing is written and nothing is
+      // pushed for this account — the report is what the push opens.
+      if (!user.dayReports) {
+        paused++;
+        continue;
+      }
       try {
         const built = await buildFactsForNarrative(user.userId, dayISO, null, 'morning');
         if (built === null) continue;
@@ -103,7 +112,7 @@ export async function GET(request: Request) {
       }
     }
     if (invalidTokens.size > 0) await pruneInvalidTokens([...invalidTokens]);
-    return Response.json({ ok: true, day: dayISO, reports, sent, notReady }, { headers: NO_STORE });
+    return Response.json({ ok: true, day: dayISO, reports, sent, notReady, paused }, { headers: NO_STORE });
   } catch (error) {
     console.error('[cron/morning-brief]', error);
     return Response.json({ error: 'Brief failed.' }, { status: 502, headers: NO_STORE });
