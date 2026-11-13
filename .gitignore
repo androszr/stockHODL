@@ -96,6 +96,7 @@ DerivedData/
 /manual-check/
 user-data/
 /.worktrees/
+/security-audit/
 
 # Design work captures stay local; never published
 docs/design/

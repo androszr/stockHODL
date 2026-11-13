@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // Vendored tooling we do not author — gitignored, but ESLint still walks it.
     ".gitnexus/**",
     ".agents/**",
+    // Cloudflare's security-audit validators, vendored byte-for-byte and
+    // pinned by SHA-256 in `upstream-pin.json` — CommonJS we may not edit.
+    ".claude/skills/security-audit/upstream/**",
     // The native client (docs/ios-native.md A.2). Stated explicitly rather
     // than left to "there is no TypeScript in there": the first .md, .json or
     // config file dropped under ios/ would start pulling ESLint plugins into a
