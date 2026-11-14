@@ -34,10 +34,12 @@ enum MarketStripFixture {
         proxySymbol: String = "SPY",
         last: String? = "645,32 USD",
         dayPct: LiveFigure? = LiveFixture.figure("+0,84%"),
+        extended: ExtendedFigure? = nil,
         spark: [ChartPoint] = [point(t: 1, v: "640.10"), point(t: 2, v: "645.32")]
     ) -> IndexTile {
         IndexTile(
             dayPct: dayPct,
+            extended: extended,
             indexName: indexName,
             key: key,
             last: last,
@@ -193,6 +195,26 @@ struct MarketStripStoreTests {
         #expect(fx.caption == "PLN per 1 USD")
         #expect(fx.last == "3,7955")
         #expect(fx.dayPct?.text == "+0,12%")
+    }
+
+    @Test("tile(for:) carries the proxy fund's pre-market move to the detail header")
+    func tileForKeyCarriesExtended() async throws {
+        let server = FakeMarketStripServer()
+        let pre = ExtendedFigure(direction: .gain, endedAtMs: nil, kind: .early,
+                                 live: true, text: "+0,42%")
+        server.payload = MarketStripFixture.payload(
+            tiles: [MarketStripFixture.tile(extended: pre)]
+        )
+        let store = makeStore(server)
+
+        await store.refresh()
+
+        let spy = try #require(store.tile(for: .spy))
+        #expect(spy.extended?.text == "+0,42%")
+        #expect(spy.extended?.kind == .early)
+        #expect(spy.dayPct?.text == "+0,84%")
+        let fx = try #require(store.tile(for: .usdpln))
+        #expect(fx.extended == nil)
     }
 
     @Test("a degraded currency tile still names itself")

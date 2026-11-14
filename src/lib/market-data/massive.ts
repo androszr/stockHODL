@@ -8,6 +8,7 @@ import { mergeCalendarSources } from './calendar-merge';
 import { persistFetchedCalendar, readStoredCalendar } from './calendar-store';
 import {
   lastCompletedSessionDateISO,
+  nextActivityBoundary,
   nextSessionActivity,
   nextTransition,
   nyDateISOAt,
@@ -957,6 +958,8 @@ async function getCalendarOverrides(): Promise<CalendarOverride[]> {
  * bell by construction. The only stale case left is an unscheduled ad-hoc
  * halt, bounded at 30 s against a 15-minute-delayed data feed and a 10 s
  * poll cadence. Do not raise it: this ceiling is the whole defense there.
+ * The extended-hours boundaries (04:00 ET start, late end) cap the expiry the
+ * same way, so pre-market is never answered as `closed` from the cache.
  */
 const STATUS_TTL_MS = 30_000;
 
@@ -1031,7 +1034,14 @@ async function getMarketStatus(): Promise<MarketSessionInfo> {
   statusCache = {
     // Expire AT the scheduled boundary, never across it — the screen can
     // never say "open" after the bell because of this cache.
-    expiresAtMs: Math.min(nowMs + ttlMs, rawTransition?.atMs ?? Infinity),
+    // The 04:00 ET early start and the late end are boundaries too: the
+    // regular-session transition alone let `closed` be served for up to 30 s
+    // after pre-market began.
+    expiresAtMs: Math.min(
+      nowMs + ttlMs,
+      rawTransition?.atMs ?? Infinity,
+      nextActivityBoundary(nowMs, overrides) ?? Infinity,
+    ),
     info,
   };
   return info;

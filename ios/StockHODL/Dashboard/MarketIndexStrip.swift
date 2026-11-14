@@ -96,16 +96,7 @@ struct IndexTileView: View {
 
             TilePrice(price: tile.last)
 
-            // The SIGN is the non-colour carrier of direction — the server's
-            // `fmtPct` writes it, and it is there whether or not the colour is
-            // perceivable. `TickerTile.sessionLine`'s else-branch, verbatim.
-            Text(tile.dayPct?.text ?? "—")
-                .font(QuietDesign.TypeRole.tileFigure)
-                .monospacedDigit()
-                .lineLimit(1)
-                .foregroundStyle(
-                    Color(tile.dayPct.map { $0.direction.token } ?? Tokens.textMuted)
-                )
+            sessionLine
 
             // The same five-session lights every holding's tile draws, on the
             // proxy's daily closes (2026-09-21).
@@ -119,14 +110,34 @@ struct IndexTileView: View {
         .accessibilityLabel(accessibilityLabel + TrendLights.phrase(for: tile.trend))
     }
 
+    /// The figure row, `TickerTile.sessionLine`'s shape: the proxy fund's
+    /// pre-market / after-hours move when the server attributes one, the day
+    /// percent otherwise. The SIGN is the non-colour carrier of direction —
+    /// the server's `fmtPct` writes it, and it is there whether or not the
+    /// colour is perceivable.
+    @ViewBuilder
+    private var sessionLine: some View {
+        if let extended = tile.extended {
+            ExtendedMoveView(extended: extended, variant: .compact)
+        } else {
+            Text(tile.dayPct?.text ?? "—")
+                .font(QuietDesign.TypeRole.tileFigure)
+                .monospacedDigit()
+                .lineLimit(1)
+                .foregroundStyle(
+                    Color(tile.dayPct.map { $0.direction.token } ?? Tokens.textMuted)
+                )
+        }
+    }
+
     /// One sentence naming the index, the fund it follows, the reading and the
     /// day's move — the same four facts the tile draws, in the same order. The
     /// fund is in here for the same reason it is on screen: a spoken level
     /// with no attribution is the same misattribution as a printed one.
     private var accessibilityLabel: String {
         let level = tile.last ?? "no reading"
-        let move = tile.dayPct.map { "\($0.text) today" } ?? "no change figure today"
-        return "\(tile.indexName), via \(tile.proxySymbol), \(level), \(move)"
+        let move = TickerTile.spokenSession(cached: nil, extended: tile.extended, dayPct: tile.dayPct)
+        return "\(tile.indexName), via \(tile.proxySymbol), \(level)\(move)"
     }
 }
 

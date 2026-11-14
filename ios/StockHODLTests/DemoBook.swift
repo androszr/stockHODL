@@ -404,17 +404,17 @@ enum DemoBook {
             market: market(),
             tiles: [
                 IndexTile(
-                    dayPct: figure("+0,42%", .gain), indexName: "S&P 500", key: .spy,
+                    dayPct: figure("+0,42%", .gain), extended: nil, indexName: "S&P 500", key: .spy,
                     last: usd("562,18"), proxySymbol: "SPY",
                     spark: spark(["558.40", "559.10", "560.80", "561.40", "562.18"]), trend: week
                 ),
                 IndexTile(
-                    dayPct: figure("+0,71%", .gain), indexName: "Nasdaq", key: .qqq,
+                    dayPct: figure("+0,71%", .gain), extended: nil, indexName: "Nasdaq", key: .qqq,
                     last: usd("487,60"), proxySymbol: "QQQ",
                     spark: spark(["482.20", "483.40", "485.10", "486.80", "487.60"]), trend: week
                 ),
                 IndexTile(
-                    dayPct: figure("-0,19%", .loss), indexName: "Dow", key: .dia,
+                    dayPct: figure("-0,19%", .loss), extended: nil, indexName: "Dow", key: .dia,
                     last: usd("418,35"), proxySymbol: "DIA",
                     spark: spark(["420.10", "419.40", "418.90", "418.20", "418.35"]), trend: week
                 ),

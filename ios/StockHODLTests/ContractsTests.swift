@@ -320,6 +320,24 @@ struct ContractsTests {
         #expect(tile.last == nil)
     }
 
+    @Test("an index tile decodes its extended figure")
+    func indexTileExtended() throws {
+        let tile = try decode(IndexTile.self, """
+        {
+          "key": "SPY",
+          "indexName": "S&P 500",
+          "proxySymbol": "SPY",
+          "last": null,
+          "dayPct": null,
+          "extended": { "kind": "early", "live": true, "endedAtMs": null, "text": "+0,42%", "direction": "gain" },
+          "spark": []
+        }
+        """)
+
+        #expect(tile.extended?.kind == .early)
+        #expect(tile.extended?.live == true)
+    }
+
     @Test("an option card decodes its total cost, and tolerates its absence")
     func optionCardTotalCost() throws {
         let withCost = try decode(OptionCardItem.self, """

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   extendedAttribution,
+  nextActivityBoundary,
   nextSessionActivity,
   nextTransition,
   nyDateISOAt,
@@ -186,6 +187,35 @@ describe('nextSessionActivity — the poll-resume instant', () => {
     expect(nextSessionActivity(Date.UTC(2026, 8, 5, 1, 0), [LABOR_DAY])).toBe(
       Date.UTC(2026, 8, 8, 8, 0),
     );
+  });
+});
+
+describe('nextActivityBoundary — the cache-expiry cap', () => {
+  it('03:59 ET weekday → that day’s 04:00 ET', () => {
+    expect(nextActivityBoundary(Date.UTC(2026, 7, 10, 7, 59), [])).toBe(Date.UTC(2026, 7, 10, 8, 0));
+  });
+
+  it('10:00 ET inside the session → that day’s 20:00 ET (late end)', () => {
+    expect(nextActivityBoundary(Date.UTC(2026, 7, 10, 14, 0), [])).toBe(Date.UTC(2026, 7, 11, 0, 0));
+  });
+
+  it('21:00 ET → the next weekday’s 04:00 ET', () => {
+    expect(nextActivityBoundary(Date.UTC(2026, 7, 11, 1, 0), [])).toBe(Date.UTC(2026, 7, 11, 8, 0));
+  });
+
+  it('Saturday → Monday 04:00 ET', () => {
+    expect(nextActivityBoundary(Date.UTC(2026, 7, 8, 12, 0), [])).toBe(Date.UTC(2026, 7, 10, 8, 0));
+  });
+
+  it('a holiday override skips to the next open day’s 04:00 ET', () => {
+    expect(nextActivityBoundary(Date.UTC(2026, 8, 5, 1, 0), [LABOR_DAY])).toBe(
+      Date.UTC(2026, 8, 8, 8, 0),
+    );
+  });
+
+  it('never returns now itself, even exactly on a boundary', () => {
+    const at = Date.UTC(2026, 7, 10, 8, 0);
+    expect(nextActivityBoundary(at, [])).toBeGreaterThan(at);
   });
 });
 

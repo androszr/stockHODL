@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { displayStringSchema } from './common';
-import { liveFigureSchema, liveMarketSchema } from './live-payload';
+import { extendedFigureSchema, liveFigureSchema, liveMarketSchema } from './live-payload';
 import { chartPointSchema } from './series';
 import { trendDaysField } from './trend';
 
@@ -62,6 +62,13 @@ export const indexTileSchema = z.object({
   last: displayStringSchema.nullable(),
   /** The day's move, from the same coherent triple as `last`. */
   dayPct: liveFigureSchema.nullable(),
+  /**
+   * The proxy fund's extended-hours figure (pre-market / after-hours), the
+   * same shape the holdings tiles carry. Null outside an attributed reading;
+   * ABSENT on an older server — hence optional AND nullable, so a build
+   * decodes a payload with or without it.
+   */
+  extended: extendedFigureSchema.nullable().optional(),
   /** Five-session strip on the proxy's daily closes — the tiles' lights. */
   trend: trendDaysField,
   /**

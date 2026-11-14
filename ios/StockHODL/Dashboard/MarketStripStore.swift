@@ -68,7 +68,8 @@ final class MarketStripStore {
             title: tile.indexName,
             caption: "via \(tile.proxySymbol)",
             last: tile.last,
-            dayPct: tile.dayPct
+            dayPct: tile.dayPct,
+            extended: tile.extended
         )
     }
 
@@ -265,4 +266,8 @@ struct MarketTileHeader: Sendable {
     let caption: String
     let last: String?
     let dayPct: LiveFigure?
+    /// The proxy fund's pre-market / after-hours move, when the server
+    /// attributes one — the figure the strip tile itself draws. Nil for the
+    /// currency tile and for an older server.
+    var extended: ExtendedFigure? = nil
 }

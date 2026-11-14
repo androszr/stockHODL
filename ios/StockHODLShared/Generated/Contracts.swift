@@ -1328,6 +1328,7 @@ enum FxRateFailureReason: String, Codable, Sendable {
 // MARK: - IndexTile
 struct IndexTile: Codable, Sendable {
     let dayPct: LiveFigure?
+    let extended: ExtendedFigure?
     let indexName: String
     let key: MarketTileKey
     let last: String?
@@ -1337,6 +1338,7 @@ struct IndexTile: Codable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case dayPct = "dayPct"
+        case extended = "extended"
         case indexName = "indexName"
         case key = "key"
         case last = "last"

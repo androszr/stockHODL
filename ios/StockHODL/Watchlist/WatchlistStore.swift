@@ -43,7 +43,21 @@ final class WatchlistStore {
     /// `LiveStore` — see the note there for why it is not read from
     /// `Reachability.shared` directly.
     private let isConnected: @MainActor () -> Bool
+    /// The wall clock the market gate reads — injected ONLY for tests, as in
+    /// `LiveStore`; production gets `Date.init`.
+    private let now: @MainActor () -> Date
+    /// The longest a shut gate sleeps between looks, and the floor between two
+    /// gate-driven refreshes. Injected ONLY for tests.
+    private let gateInterval: Duration
+    /// The resume instant an `idle` frame carried; see `LiveStore`.
+    private var idleResumesAtMs: Int?
+    /// When the gate last triggered a refresh; see `LiveStore`.
+    private var lastGateRefresh: ContinuousClock.Instant?
     private var pump: Task<Void, Never>?
+
+    /// How often a shut gate looks at the clock when no nearer instant is
+    /// known. Sleeping costs no network traffic.
+    static let gateInterval: Duration = .seconds(60)
     /// Whether this tab has ever been opened. The scene wiring lives in the
     /// shell now, above every tab, and a store nobody has opened must stay
     /// cold — otherwise coming back to the foreground would fetch three tabs
@@ -57,12 +71,16 @@ final class WatchlistStore {
             ttl: CacheTTL.quotes
         ),
         tokenProvider: @escaping @MainActor () -> String?,
-        isConnected: @escaping @MainActor () -> Bool = { true }
+        isConnected: @escaping @MainActor () -> Bool = { true },
+        now: @escaping @MainActor () -> Date = Date.init,
+        gateInterval: Duration = WatchlistStore.gateInterval
     ) {
         self.client = client
         self.cache = cache
         self.tokenProvider = tokenProvider
         self.isConnected = isConnected
+        self.now = now
+        self.gateInterval = gateInterval
     }
 
     /// The live figures for a row, matched by instrument id. Nil while the
@@ -113,7 +131,10 @@ final class WatchlistStore {
 
         do {
             items = try await itemsTask
-            if let freshQuotes { live = freshQuotes }
+            if let freshQuotes {
+                live = freshQuotes
+                idleResumesAtMs = nil
+            }
             let now = Date()
             stale.succeeded(at: now)
             cache.write(CachedWatchlist(items: items, quotes: live), at: now)
@@ -125,13 +146,19 @@ final class WatchlistStore {
             // pump that finished without being cleared. Pull-to-refresh only
             // ever calls `refresh()`, so without this it can never restore the
             // live cadence once the pump has died — see `LiveStore.refresh()`.
-            if hasStarted {
+            // Not from a cancelled caller: that is the gate's refresh inside a
+            // pump backgrounding just cancelled (see `LiveStore.refresh()`).
+            if hasStarted, !Task.isCancelled {
                 resumePump()
             }
         } catch {
             #if DEBUG
                 print("[watchlist] refresh failed: \(error)")
             #endif
+            if Task.isCancelled {
+                isLoading = false
+                return
+            }
             stale.connectivityChanged(to: isConnected())
             stale.failed()
             if items.isEmpty {
@@ -207,23 +234,27 @@ final class WatchlistStore {
 
     // MARK: - The pump
 
+    /// Arms the loop UNCONDITIONALLY — the market gate lives inside `runPump`
+    /// (`awaitGate`); see `LiveStore.resumePump()` for why gating the arming
+    /// too left a screen left open overnight blind to pre-market opening.
     private func resumePump() {
         pump?.cancel()
-        guard stillPollable else {
-            pump = nil
-            return
-        }
         pump = Task { [weak self] in await self?.runPump() }
     }
 
-    /// Stream first, poll when the server asks for it, silence when the market
-    /// is closed. A clean end of stream is the ordinary case on Vercel and
+    /// Stream first, poll when the server asks for it, sleep at the gate (no
+    /// requests) when the market is closed until its resume instant. A clean end of stream is the ordinary case on Vercel and
     /// means reconnect — see `LiveStore.runPump`, which this mirrors.
     private func runPump() async {
         guard let token = tokenProvider() else { return }
 
         while !Task.isCancelled {
+            guard stillPollable else {
+                await awaitGate()
+                continue
+            }
             var fellBack = false
+            var idled = false
 
             do {
                 for try await event in client.stream(token: token) {
@@ -231,14 +262,15 @@ final class WatchlistStore {
                     switch event {
                     case let .payload(payload):
                         applyTick(payload)
-                    case .idle:
-                        return
+                    case let .idle(resumesAtMs):
+                        idleResumesAtMs = resumesAtMs
+                        idled = true
                     case .fallback:
                         fellBack = true
                     case .bye:
                         break
                     }
-                    if fellBack { break }
+                    if fellBack || idled { break }
                 }
             } catch {
                 #if DEBUG
@@ -254,9 +286,14 @@ final class WatchlistStore {
 
             if Task.isCancelled { return }
 
+            if idled {
+                await awaitGate()
+                continue
+            }
+
             if fellBack {
                 await poll(token: token)
-                return
+                continue
             }
 
             try? await Task.sleep(
@@ -265,8 +302,42 @@ final class WatchlistStore {
                     : Backoff.whileDisconnected
             )
             stale.connectivityChanged(to: isConnected())
-            guard stillPollable else { return }
         }
+    }
+
+    /// The market gate; see `LiveStore.awaitGate()` — same contract. No request
+    /// while every session is shut; sleeps, then asks once the resume instant
+    /// has passed (INTEGER milliseconds, no float conversion).
+    private func awaitGate() async {
+        let instant = idleResumesAtMs ?? live?.market.pollingResumesAtMs
+        let nowMs = Int(now().timeIntervalSince1970 * 1000)
+        if let instant {
+            if nowMs >= instant {
+                await openGate()
+            } else {
+                try? await Task.sleep(for: min(gateInterval, .milliseconds(instant - nowMs)))
+            }
+            return
+        }
+        let active = live.map { PollPolicy.isActiveStatus($0.market.status) } ?? false
+        try? await Task.sleep(for: gateInterval)
+        if Task.isCancelled || active { return }
+        await openGate()
+    }
+
+    /// One gate-driven refresh; `refresh()` re-arms the pump and so cancels
+    /// the task calling this. Two are never closer than `gateInterval`.
+    private func openGate() async {
+        if let last = lastGateRefresh {
+            let since = last.duration(to: .now)
+            if since < gateInterval {
+                try? await Task.sleep(for: gateInterval - since)
+                return
+            }
+        }
+        lastGateRefresh = .now
+        idleResumesAtMs = nil
+        await refresh()
     }
 
     private func poll(token: String) async {
@@ -306,6 +377,7 @@ final class WatchlistStore {
 
     private func applyTick(_ payload: WatchlistPayload) {
         live = payload
+        idleResumesAtMs = nil
         let now = Date()
         stale.succeeded(at: now)
         // The tick carries the FRESHER quotes; the membership list is

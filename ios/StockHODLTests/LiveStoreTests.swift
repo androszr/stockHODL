@@ -92,7 +92,9 @@ private func makeStore(
     server: FakeServer = FakeServer(),
     snapshots: FakeSnapshots = FakeSnapshots(),
     token: String? = "signed.token",
-    connected: Bool = true
+    connected: Bool = true,
+    gateInterval: Duration = LiveStore.gateInterval,
+    now: @escaping @MainActor () -> Date = Date.init
 ) -> LiveStore {
     let config = AppConfig(baseURL: URL(string: "https://example.test")!)
     return LiveStore(
@@ -105,7 +107,9 @@ private func makeStore(
         // test's remembered scope decide what another test opened on — which
         // is exactly how this surfaced: adding two unrelated suites reordered
         // the run and a passing assertion started failing.
-        defaults: UserDefaults(suiteName: "test.\(UUID().uuidString)") ?? .standard
+        defaults: UserDefaults(suiteName: "test.\(UUID().uuidString)") ?? .standard,
+        now: now,
+        gateInterval: gateInterval
     )
 }
 
@@ -475,6 +479,85 @@ struct LiveStoreTests {
 
         #expect(server.bootstrapCalls == 0)
         #expect(server.liveCalls == 0)
+    }
+
+    // MARK: - The market gate
+
+    /// The bug this pins: the pump used to exit for good on a closed market and
+    /// discard the resume instant, so a screen left open overnight never saw
+    /// pre-market begin. The market stays CLOSED in the fixture after the wake
+    /// so no real stream is opened against `example.test`.
+    @Test("a foregrounded store wakes itself when the market gate opens between ticks")
+    func gateReopeningRevivesThePump() async {
+        let server = FakeServer()
+        let clock = FakeGateClock(seconds: 1_000)
+        server.payload = LiveFixture.payload(status: .closed, resumesAtMs: 1_010_000)
+        let store = makeStore(server: server, gateInterval: .milliseconds(20), now: { clock.now() })
+
+        await store.start()
+        #expect(server.liveCalls == 1)
+        #expect(server.bootstrapCalls == 1)
+
+        // Ticks pass while the gate is shut; not one costs a request.
+        let readsAtStart = clock.reads
+        await until(timeout: .seconds(30)) { clock.reads >= readsAtStart + 3 }
+        #expect(clock.reads >= readsAtStart + 3)
+        #expect(server.liveCalls == 1)
+        #expect(server.bootstrapCalls == 1)
+
+        // Past the resume instant, with no scene-phase and no connectivity
+        // event: the loop's own next look is what asks.
+        clock.seconds = 1_010
+        await until(timeout: .seconds(30)) { server.liveCalls > 1 }
+        #expect(server.liveCalls > 1)
+
+        store.scenePhaseChanged(toActive: false)
+    }
+
+    @Test("backgrounding stops the gate loop")
+    func backgroundingStopsTheGateLoop() async {
+        let server = FakeServer()
+        let clock = FakeGateClock(seconds: 1_000)
+        server.payload = LiveFixture.payload(status: .closed, resumesAtMs: 1_010_000)
+        let store = makeStore(server: server, gateInterval: .milliseconds(20), now: { clock.now() })
+
+        await store.start()
+        store.scenePhaseChanged(toActive: false)
+        let after = server.liveCalls
+
+        clock.seconds = 1_010
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(server.liveCalls == after)
+    }
+
+    @Test("a closed market with no resume instant re-asks on the fallback cadence")
+    func closedWithNoResumeInstantReasks() async {
+        let server = FakeServer()
+        server.payload = LiveFixture.payload(status: .closed)
+        let store = makeStore(server: server, gateInterval: .milliseconds(20))
+
+        await store.start()
+        await until(timeout: .seconds(30)) { server.liveCalls > 1 }
+        #expect(server.liveCalls > 1)
+
+        store.scenePhaseChanged(toActive: false)
+    }
+
+    @Test("an open market with nothing pollable parks without a request")
+    func openWithNothingPollableParks() async {
+        let server = FakeServer()
+        let clock = FakeGateClock(seconds: 1_000)
+        server.payload = LiveFixture.payload(status: .marketStatusOpen, hasPollableSymbols: false)
+        let store = makeStore(server: server, gateInterval: .milliseconds(20), now: { clock.now() })
+
+        await store.start()
+        let readsAtStart = clock.reads
+        await until(timeout: .seconds(30)) { clock.reads >= readsAtStart + 3 }
+        #expect(clock.reads >= readsAtStart + 3)
+        #expect(server.liveCalls == 1)
+        #expect(server.bootstrapCalls == 1)
+
+        store.scenePhaseChanged(toActive: false)
     }
 }
 

@@ -76,12 +76,13 @@ enum LiveFixture {
         hasPollableSymbols: Bool = true,
         holdings: [LiveHolding]? = nil,
         scopes: [LiveScope] = [],
-        totalValue: String? = "23 708,11 PLN"
+        totalValue: String? = "23 708,11 PLN",
+        resumesAtMs: Int? = nil
     ) -> LivePayload {
         LivePayload(
             hasPollableSymbols: hasPollableSymbols,
             holdings: holdings ?? [holding(instrumentId: "i1")],
-            market: market(status: status),
+            market: market(status: status, resumesAtMs: resumesAtMs),
             scopes: scopes,
             summary: summary(totalValue: totalValue)
         )
@@ -267,7 +268,8 @@ enum LiveFixture {
     static func watchPayload(
         status: MarketStatus = .marketStatusOpen,
         hasPollableSymbols: Bool = true,
-        items: [LiveWatchItem]? = nil
+        items: [LiveWatchItem]? = nil,
+        resumesAtMs: Int? = nil
     ) -> WatchlistPayload {
         WatchlistPayload(
             hasPollableSymbols: hasPollableSymbols,
@@ -281,7 +283,7 @@ enum LiveFixture {
                     targetGroup: TargetGroup.none
                 ),
             ],
-            market: market(status: status)
+            market: market(status: status, resumesAtMs: resumesAtMs)
         )
     }
 

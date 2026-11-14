@@ -406,3 +406,27 @@ export function nextSessionActivity(
   }
   return null;
 }
+
+/**
+ * The next instant the extended-hours phase changes — the 04:00 ET early
+ * start or the late end (`closeMs + LATE_SESSION_MS`) of a session day —
+ * strictly after `nowMs`. Unlike {@link nextSessionActivity} it never returns
+ * `nowMs`, so it can cap a cache expiry. Null past the scan bound.
+ */
+export function nextActivityBoundary(
+  nowMs: number,
+  overrides: readonly CalendarOverride[],
+): number | null {
+  let dateISO = nyDateISOAt(nowMs);
+  for (let i = 0; i <= MAX_SCAN_DAYS; i++) {
+    const session = regularSessionFor(dateISO, overrides);
+    if (session) {
+      const startMs = nyWallToUtc(dateISO, EARLY_OPEN_HOUR, 0);
+      const endMs = session.closeMs + LATE_SESSION_MS;
+      if (startMs > nowMs) return startMs;
+      if (endMs > nowMs) return endMs;
+    }
+    dateISO = addDaysISO(dateISO, 1);
+  }
+  return null;
+}

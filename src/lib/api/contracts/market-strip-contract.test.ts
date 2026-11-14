@@ -84,7 +84,7 @@ describe('marketStripPayloadSchema mirrors the real composer', () => {
 
   it('carries no field the contract does not name', () => {
     const payload = realPayload();
-    const tileKeys = new Set(['key', 'indexName', 'proxySymbol', 'last', 'dayPct', 'trend', 'spark']);
+    const tileKeys = new Set(['key', 'indexName', 'proxySymbol', 'last', 'dayPct', 'extended', 'trend', 'spark']);
 
     expect(Object.keys(payload).sort()).toEqual(['fx', 'market', 'tiles']);
     for (const tile of payload.tiles) {
@@ -94,6 +94,26 @@ describe('marketStripPayloadSchema mirrors the real composer', () => {
         );
       }
     }
+  });
+
+  it('accepts a tile with extended absent, null, or populated', () => {
+    const payload = realPayload();
+    const withTile = (tile: Record<string, unknown>) => ({
+      ...payload,
+      tiles: [tile, ...payload.tiles.slice(1)],
+    });
+    const absent: Record<string, unknown> = { ...payload.tiles[0] };
+    delete absent.extended;
+    expect(marketStripPayloadSchema.safeParse(withTile(absent)).success).toBe(true);
+    expect(
+      marketStripPayloadSchema.safeParse(withTile({ ...payload.tiles[0], extended: null })).success,
+    ).toBe(true);
+    const populated = withTile({
+      ...payload.tiles[0],
+      extended: { kind: 'early', live: true, endedAtMs: null, text: '+0,42%', direction: 'gain' },
+    });
+    const parsed = marketStripPayloadSchema.safeParse(populated);
+    expect(parsed.success, JSON.stringify(parsed.error?.issues)).toBe(true);
   });
 
   it('refuses a numeric price — money never crosses the wire as a number', () => {

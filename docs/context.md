@@ -764,8 +764,19 @@ change must work on every iPhone size the app already supports.
   re-deriving it from prices.
 
   `LiveStore` runs ONE pump: SSE while the market is live, falling back to the
-  10 s REST cadence when the server says `fallback`, and stopping entirely on
-  `idle` or a closed market — zero requests, which is the point. A clean end of
+  10 s REST cadence when the server says `fallback`. On `idle` or a closed
+  market the pump is NOT torn down (2026-11-14,
+  plans/2026-11-14-premarket-movement-wakeup.md): it stays armed and sleeps at
+  a gate — zero requests while every session is shut — until the
+  `pollingResumesAtMs` instant the server named (a 60 s re-check when none is
+  known), then takes one fresh REST reading and reconnects. Gate-driven reads
+  are floored at one per 60 s, so a resume instant already in the past (a
+  skewed clock, an old server) cannot spin the loop, and a refresh whose pump
+  was cancelled by backgrounding neither re-arms it nor marks the bar stale.
+  A screen left open
+  overnight therefore shows the pre-market move on its own; `WatchlistStore`
+  runs the identical gate over its own copy of the loop. Without that loop
+  nothing was left running to notice pre-market begin. A clean end of
   stream is NOT an error: Vercel caps the function, so ending is ordinary and
   means reconnect. `scenePhase` tears the pump down on `.background` and, on
   `.active`, takes a fresh REST baseline BEFORE reconnecting, since the stream
@@ -1045,7 +1056,13 @@ change must work on every iPhone size the app already supports.
   + `getInstrumentPriceSeries` with the 5-year watched anchor (never the
   user's trade anchor). The rate prints four decimals everywhere via
   `ChartUnit.rate`. The tile refreshes on the strip's US-market poll gate,
-  not around the clock — deliberate.
+  not around the clock — deliberate. Since 2026-11-14
+  (plans/2026-11-14-premarket-movement-wakeup.md) each index tile also
+  carries the proxy fund's `extended` figure (optional + nullable, the same
+  `ExtendedFigure` the holdings tiles draw), so the strip shows the
+  pre-market / after-hours move instead of a stale day figure; the server's
+  market-status cache now also expires at the 04:00 ET early start and the
+  late end (`nextActivityBoundary`).
 
   **Day report (2026-09-19, plans/2026-09-19-day-report-page.md).** Two
   weekday crons, a pre-open Morning brief (`/api/cron/morning-brief`, 12:30,

@@ -61,7 +61,9 @@ private func makeStore(
     _ server: FakeWatchServer,
     token: String? = "t",
     cache: FakePayloadCache<CachedWatchlist> = FakePayloadCache<CachedWatchlist>(),
-    connected: Bool = true
+    connected: Bool = true,
+    gateInterval: Duration = WatchlistStore.gateInterval,
+    now: @escaping @MainActor () -> Date = Date.init
 ) -> WatchlistStore {
     WatchlistStore(
         client: WatchlistClient(
@@ -73,7 +75,9 @@ private func makeStore(
         // In memory, never the real Caches directory — see `FakeCaches`.
         cache: cache,
         tokenProvider: { token },
-        isConnected: { connected }
+        isConnected: { connected },
+        now: now,
+        gateInterval: gateInterval
     )
 }
 
@@ -257,5 +261,43 @@ struct WatchlistOfflineTests {
 
         let cached = try! #require(cache.read())
         #expect(!cached.value.items.isEmpty)
+    }
+
+    @Test("a foregrounded store wakes itself when the market gate opens between ticks")
+    func gateReopeningRevivesThePump() async {
+        let server = FakeWatchServer()
+        let clock = FakeGateClock(seconds: 1_000)
+        server.payload = LiveFixture.watchPayload(status: .closed, resumesAtMs: 1_010_000)
+        let store = makeStore(server, gateInterval: .milliseconds(20), now: { clock.now() })
+
+        await store.start()
+        #expect(server.quoteCalls == 1)
+
+        let readsAtStart = clock.reads
+        await until(timeout: .seconds(30)) { clock.reads >= readsAtStart + 3 }
+        #expect(clock.reads >= readsAtStart + 3)
+        #expect(server.quoteCalls == 1)
+
+        clock.seconds = 1_010
+        await until(timeout: .seconds(30)) { server.quoteCalls > 1 }
+        #expect(server.quoteCalls > 1)
+
+        store.scenePhaseChanged(toActive: false)
+    }
+
+    @Test("backgrounding stops the gate loop")
+    func backgroundingStopsTheGateLoop() async {
+        let server = FakeWatchServer()
+        let clock = FakeGateClock(seconds: 1_000)
+        server.payload = LiveFixture.watchPayload(status: .closed, resumesAtMs: 1_010_000)
+        let store = makeStore(server, gateInterval: .milliseconds(20), now: { clock.now() })
+
+        await store.start()
+        store.scenePhaseChanged(toActive: false)
+        let after = server.quoteCalls
+
+        clock.seconds = 1_010
+        try? await Task.sleep(for: .milliseconds(80))
+        #expect(server.quoteCalls == after)
     }
 }

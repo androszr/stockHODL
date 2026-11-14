@@ -120,6 +120,13 @@ struct MarketDetailView: View {
                         .monospacedDigit()
                         .foregroundStyle(Color(day.direction.token))
                 }
+
+                // The strip tile shows this move in place of the day figure;
+                // here there is room for both, so the screen never disagrees
+                // with the tile that opened it.
+                if let extended = header?.extended {
+                    ExtendedMoveView(extended: extended, variant: .full)
+                }
             }
         }
         .accessibilityElement(children: .combine)
@@ -132,7 +139,12 @@ struct MarketDetailView: View {
         let title = header?.title ?? fallbackTitle
         let caption = header?.caption ?? ""
         let level = header?.last ?? "no reading"
-        let move = header?.dayPct.map { "\($0.text) today" } ?? "no change figure today"
+        let day = header?.dayPct.map { "\($0.text) today" } ?? "no change figure today"
+        // `spokenSession` leads with ", " and names the session itself.
+        let session = header?.extended.map {
+            TickerTile.spokenSession(cached: nil, extended: $0, dayPct: nil)
+        } ?? ""
+        let move = day + session
         return caption.isEmpty ? "\(title), \(level), \(move)" : "\(title), \(caption), \(level), \(move)"
     }
 }

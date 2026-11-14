@@ -108,6 +108,7 @@ export function composeMarketStrip(
       proxySymbol: proxy.proxySymbol,
       last: figures.price,
       dayPct: figures.dayPct,
+      extended: figures.extended,
       trend: trendBySymbol.get(proxy.proxySymbol),
       spark: [...(sparkBySymbol.get(proxy.proxySymbol) ?? [])],
     };

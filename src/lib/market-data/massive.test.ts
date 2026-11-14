@@ -202,6 +202,44 @@ describe('getMarketStatus — TTL cache', () => {
     expect(nowCalls()).toBe(2);
   });
 
+  it('expiry is capped at the early open: 03:59:50 ET closed → 04:00:05 ET early_trading', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-17T07:59:50Z'));
+    const provider = await freshProvider();
+    let phase: Record<string, unknown> = { market: 'closed' };
+    mockVendor(() => Promise.resolve(new Response(JSON.stringify(phase), { status: 200 })));
+
+    const before = await provider.getMarketStatus();
+    expect(before.status).toBe('closed');
+
+    phase = { earlyHours: true };
+    vi.setSystemTime(new Date('2026-08-17T08:00:05Z'));
+    const after = await provider.getMarketStatus();
+
+    expect(after.status).toBe('early_trading');
+    expect(after.pollingResumesAtMs).toBeNull();
+    expect(nowCalls()).toBe(2);
+  });
+
+  it('expiry is capped at the late end: 19:59:50 ET late_trading → 20:00:05 ET closed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-08-17T23:59:50Z'));
+    const provider = await freshProvider();
+    let phase: Record<string, unknown> = { afterHours: true };
+    mockVendor(() => Promise.resolve(new Response(JSON.stringify(phase), { status: 200 })));
+
+    const before = await provider.getMarketStatus();
+    expect(before.status).toBe('late_trading');
+
+    phase = { market: 'closed' };
+    vi.setSystemTime(new Date('2026-08-18T00:00:05Z'));
+    const after = await provider.getMarketStatus();
+
+    expect(after.status).toBe('closed');
+    expect(after.pollingResumesAtMs).toBe(Date.UTC(2026, 7, 18, 8, 0));
+    expect(nowCalls()).toBe(2);
+  });
+
   it('a vendor-down (clock-derived) answer is re-asked after 10 s, not 30', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));

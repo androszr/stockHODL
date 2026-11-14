@@ -103,6 +103,20 @@ describe('composeMarketStrip', () => {
     expect(payload.tiles[0].dayPct?.direction).toBe('loss');
   });
 
+  it('carries a live pre-market figure on the tile', () => {
+    const early = quote({ extendedKind: 'early', extendedLive: true, extendedChangePct: '0.42' });
+    const payload = compose(new Map([['SPY', early]]), new Map(), MARKET);
+
+    expect(payload.tiles[0].extended?.kind).toBe('early');
+    expect(payload.tiles[0].extended?.live).toBe(true);
+  });
+
+  it('carries no extended figure when the quote has no reading', () => {
+    const payload = compose(allQuotes(), new Map(), MARKET);
+
+    expect(payload.tiles[0].extended).toBeNull();
+  });
+
   it('nulls a missing quote without disturbing its neighbours', () => {
     const payload = compose(
       new Map([
